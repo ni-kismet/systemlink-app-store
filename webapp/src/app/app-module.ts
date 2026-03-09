@@ -1,4 +1,4 @@
-import { NgModule, CUSTOM_ELEMENTS_SCHEMA, provideBrowserGlobalErrorListeners } from '@angular/core';
+import { NgModule, CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 import { FormsModule } from '@angular/forms';
 import { APP_BASE_HREF } from '@angular/common';
@@ -73,7 +73,6 @@ import { PermissionBannerComponent } from './shared/permission-banner.component'
     NimbleAnchorButtonModule,
   ],
   providers: [
-    provideBrowserGlobalErrorListeners(),
     { provide: APP_BASE_HREF, useValue: '/' },
   ],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],

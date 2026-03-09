@@ -1,5 +1,3 @@
-webapp/.playwright-cli/
-
 # Node and npm
 node_modules/
 .npm/
@@ -25,3 +23,7 @@ out/
 # Logs and OS files
 *.log
 .DS_Store
+
+# Playwright test artifacts
+.playwright-cli/
+webapp/.playwright-cli/
