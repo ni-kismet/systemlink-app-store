@@ -1,0 +1,103 @@
+name: Validate Submission
+
+on:
+  pull_request:
+    paths:
+      - 'submissions/**'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate app submission
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Detect changed submissions
+        id: changed
+        run: |
+          # Find submission directories that were changed in this PR
+          DIRS=$(git diff --name-only --diff-filter=ACMR origin/${{ github.base_ref }}...HEAD \
+            | grep '^submissions/' \
+            | cut -d'/' -f1-2 \
+            | sort -u)
+          echo "dirs<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$DIRS" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Validate manifests against schema
+        run: |
+          pip install jsonschema
+          python -c "
+          import json, sys
+          from jsonschema import validate, ValidationError
+          from pathlib import Path
+
+          schema = json.loads(Path('app-manifest.schema.json').read_text())
+          dirs = '''${{ steps.changed.outputs.dirs }}'''.strip().splitlines()
+          errors = []
+          for d in dirs:
+              if not d.strip():
+                  continue
+              manifest_path = Path(d) / 'manifest.json'
+              if not manifest_path.is_file():
+                  errors.append(f'{d}: missing manifest.json')
+                  continue
+              try:
+                  manifest = json.loads(manifest_path.read_text())
+                  validate(instance=manifest, schema=schema)
+                  print(f'✓ {d}: schema valid')
+              except ValidationError as e:
+                  errors.append(f'{d}: {e.message}')
+              except json.JSONDecodeError as e:
+                  errors.append(f'{d}: invalid JSON: {e}')
+          if errors:
+              for e in errors:
+                  print(f'✗ {e}', file=sys.stderr)
+              sys.exit(1)
+          print('All manifests valid.')
+          "
+
+      - name: Run full validation
+        run: python scripts/rebuild_index.py --validate-only
+
+      - name: Check .nipkg size
+        run: |
+          MAX_SIZE=$((100 * 1024 * 1024))  # 100 MB
+          DIRS="${{ steps.changed.outputs.dirs }}"
+          for dir in $DIRS; do
+            [ -z "$dir" ] && continue
+            for nipkg in "$dir"/*.nipkg; do
+              [ -f "$nipkg" ] || continue
+              SIZE=$(stat -c%s "$nipkg" 2>/dev/null || stat -f%z "$nipkg")
+              if [ "$SIZE" -gt "$MAX_SIZE" ]; then
+                echo "✗ $nipkg is ${SIZE} bytes (max ${MAX_SIZE})" >&2
+                exit 1
+              fi
+              echo "✓ $nipkg is ${SIZE} bytes (within limit)"
+            done
+          done
+
+      - name: Check for duplicate package names
+        run: |
+          python -c "
+          import json, sys
+          from pathlib import Path
+
+          seen = {}
+          for manifest_path in sorted(Path('submissions').glob('*/manifest.json')):
+              manifest = json.loads(manifest_path.read_text())
+              pkg = manifest.get('package', '')
+              d = manifest_path.parent.name
+              if pkg in seen:
+                  print(f'✗ Duplicate package name \"{pkg}\" in {d} and {seen[pkg]}', file=sys.stderr)
+                  sys.exit(1)
+              seen[pkg] = d
+          print(f'✓ No duplicate package names ({len(seen)} unique)')
+          "

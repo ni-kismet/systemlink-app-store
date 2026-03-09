@@ -1,0 +1,63 @@
+name: Publish Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      submission:
+        description: 'Submission directory name (under submissions/)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: Create GitHub Release with .nipkg
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read manifest
+        id: manifest
+        run: |
+          DIR="submissions/${{ inputs.submission }}"
+          if [ ! -f "$DIR/manifest.json" ]; then
+            echo "✗ No manifest.json found in $DIR" >&2
+            exit 1
+          fi
+          PACKAGE=$(jq -r '.package' "$DIR/manifest.json")
+          VERSION=$(jq -r '.version' "$DIR/manifest.json")
+          DISPLAY_NAME=$(jq -r '.displayName' "$DIR/manifest.json")
+          echo "package=$PACKAGE" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "display_name=$DISPLAY_NAME" >> "$GITHUB_OUTPUT"
+          echo "tag=${PACKAGE}-v${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Find .nipkg file
+        id: nipkg
+        run: |
+          DIR="submissions/${{ inputs.submission }}"
+          NIPKG=$(find "$DIR" -name '*.nipkg' -maxdepth 1 | head -1)
+          if [ -z "$NIPKG" ]; then
+            echo "✗ No .nipkg file found in $DIR" >&2
+            exit 1
+          fi
+          echo "path=$NIPKG" >> "$GITHUB_OUTPUT"
+          echo "name=$(basename "$NIPKG")" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.manifest.outputs.tag }}" \
+            "${{ steps.nipkg.outputs.path }}" \
+            --title "${{ steps.manifest.outputs.display_name }} v${{ steps.manifest.outputs.version }}" \
+            --notes "Release of ${{ steps.manifest.outputs.display_name }} version ${{ steps.manifest.outputs.version }}" \
+            --latest=false
+
+      - name: Trigger index rebuild
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run rebuild-index.yml --ref main
