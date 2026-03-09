@@ -2,7 +2,7 @@ Architecture: windows_all
 Description: A dashboard for monitoring asset health, calibration status, and utilization across your SystemLink-managed fleet. Displays key metrics in a card-based layout with filtering by workspace and asset group.
 DisplayName: Asset Health Dashboard
 DisplayVersion: 1.0.0
-Filename: https://github.com/ni/systemlink-app-store/releases/download/example-asset-dashboard-v1.0.0/example-asset-dashboard_1.0.0_windows_all.nipkg
+Filename: https://github.com/ni-kismet/systemlink-app-store/releases/download/example-asset-dashboard-v1.0.0/example-asset-dashboard_1.0.0_windows_all.nipkg
 Homepage: https://github.com/ni/systemlink-app-store
 MD5sum: 
 Maintainer: NI App Store <appstore@ni.com>
