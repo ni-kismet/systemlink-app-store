@@ -19,8 +19,7 @@
         </p>
         <label class="field-label">Feed URL</label>
         <nimble-text-field
-          [value]="feedUrl"
-          (input)="feedUrl = $any($event).target.value"
+          [(ngModel)]="feedUrl"
           placeholder="https://…">
         </nimble-text-field>
         <nimble-button appearance="outline" (click)="replicateFeed()" [disabled]="loading">

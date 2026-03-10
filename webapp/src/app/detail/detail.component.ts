@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 import { AppPackage, InstalledApp, InstallManifest, DEFAULT_FEED_URL } from '../models/app-store.models';
 // DEFAULT_FEED_URL is used only for createEmptyManifest (the source URL on first onboarding)
 import { AppStoreService } from '../services/app-store.service';
@@ -25,7 +25,6 @@ export class AppDetailComponent implements OnInit {
 
   constructor(
     private route: ActivatedRoute,
-    private router: Router,
     private appStoreService: AppStoreService,
   ) {}
 
@@ -137,9 +136,5 @@ export class AppDetailComponent implements OnInit {
     } finally {
       this.actionLoading = false;
     }
-  }
-
-  goBack(): void {
-    this.router.navigate(['/catalog']);
   }
 }

@@ -121,13 +121,4 @@ export class CatalogComponent implements OnInit {
     }
   }
 
-  onSearchChange(value: string): void {
-    this.searchTerm = value;
-    this.applyFilters();
-  }
-
-  onCategoryChange(value: string): void {
-    this.selectedCategory = value;
-    this.applyFilters();
-  }
 }

@@ -1,34 +1,46 @@
 .catalog-toolbar {
   display: flex;
-  gap: 12px;
-  padding: 16px 0;
+  gap: var(--sl-app-space-3);
+  padding: var(--sl-app-space-4) 0;
   align-items: center;
 
   nimble-text-field {
     flex: 1;
-    max-width: 400px;
+    max-width: 25rem;
   }
 }
 
 .loading-container {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 48px;
   justify-content: center;
-  color: #666;
+  gap: var(--sl-app-space-3);
+  padding: calc(var(--sl-app-space-6) * 2);
+  color: var(--sl-app-color-text-muted);
 }
 
 .app-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 16px;
-  padding-bottom: 24px;
+  grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
+  gap: var(--sl-app-space-4);
+  padding-bottom: var(--sl-app-space-6);
 }
 
 .empty-state {
   grid-column: 1 / -1;
   text-align: center;
-  padding: 48px;
-  color: #888;
+  padding: calc(var(--sl-app-space-6) * 2);
+  color: var(--sl-app-color-text-muted);
+
+  p {
+    margin: 0;
+    font: var(--sl-app-font-body);
+  }
+}
+
+@media (max-width: 768px) {
+  .catalog-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }

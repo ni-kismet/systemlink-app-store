@@ -1,86 +1,87 @@
 .onboarding-container {
   display: flex;
   justify-content: center;
-  padding: 48px 16px;
+  padding: calc(var(--sl-app-space-6) * 2) var(--sl-app-space-4);
 }
 
 .onboarding-card {
-  max-width: 560px;
+  max-width: 35rem;
   width: 100%;
 
   h2 {
-    margin-bottom: 24px;
+    margin-bottom: var(--sl-app-space-6);
+    font: var(--sl-app-font-title-plus-1);
   }
 }
 
 .step {
-  margin-bottom: 24px;
-  padding: 16px;
-  border: 1px solid #e0e0e0;
-  border-radius: 4px;
-  opacity: 0.5;
-  transition: opacity 0.2s ease;
+  margin-bottom: var(--sl-app-space-6);
+  padding: var(--sl-app-space-4);
+  border: 1px solid var(--sl-app-color-border);
+  border-radius: var(--sl-app-space-1);
+  opacity: 0.6;
+  transition: opacity var(--ni-nimble-medium-delay, 0.15s) ease;
+  background: var(--sl-app-color-surface);
 
   &.active {
     opacity: 1;
-    border-color: #0d6efd;
+    border-color: var(--sl-app-color-accent);
+    box-shadow: var(--sl-app-shadow-1);
   }
 
   &.done {
-    opacity: 0.7;
+    opacity: 0.8;
   }
 }
 
 .step-header {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--sl-app-space-3);
 }
 
 .step-number {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 1.75rem;
+  height: 1.75rem;
   border-radius: 50%;
-  border: 2px solid #ccc;
-  font-weight: 600;
-  font-size: 14px;
-  color: #888;
+  border: 2px solid var(--sl-app-color-border-strong);
+  font: var(--sl-app-font-body-emphasized);
+  color: var(--sl-app-color-text-muted);
 
   &.completed {
-    border-color: #198754;
-    background: #198754;
-    color: #fff;
+    border-color: var(--sl-app-color-success);
+    background: var(--sl-app-color-success);
+    color: var(--sl-app-color-accent-contrast);
   }
 }
 
 .step-title {
-  font-weight: 600;
-  font-size: 15px;
+  font: var(--sl-app-font-body-emphasized);
 }
 
 .step-body {
-  margin-top: 12px;
-  padding-left: 40px;
+  margin-top: var(--sl-app-space-3);
+  padding-left: 2.5rem;
 
   p {
-    margin: 0 0 12px;
-    color: #555;
-    font-size: 14px;
+    margin: 0 0 var(--sl-app-space-3);
+    color: var(--sl-app-color-text);
+    font: var(--sl-app-font-body);
     line-height: 1.5;
   }
 }
 
 .field-label {
   display: block;
-  font-size: 13px;
-  color: #666;
-  margin-bottom: 4px;
+  margin-bottom: var(--sl-app-space-1);
+  color: var(--sl-app-color-text-muted);
+  font: var(--sl-app-font-control-label);
 }
 
 nimble-text-field {
   width: 100%;
-  margin-bottom: 12px;
+  margin-bottom: var(--sl-app-space-3);
 }

@@ -114,17 +114,21 @@ import { BrowserModule } from '@angular/platform-browser';
 import { FormsModule } from '@angular/forms';
 import { APP_BASE_HREF } from '@angular/common';
 
-// Nimble modules — import exactly from these subpaths
-import { NimbleThemeProviderModule } from '@ni/nimble-angular';
-import { NimbleTableModule } from '@ni/nimble-angular/table';
-import { NimbleTableColumnTextModule } from '@ni/nimble-angular/table-column/text';
-import { NimbleButtonModule } from '@ni/nimble-angular/button';
-import { NimbleTextFieldModule } from '@ni/nimble-angular/text-field';
-import { NimbleSelectModule } from '@ni/nimble-angular/select';
-import { NimbleListOptionModule } from '@ni/nimble-angular/list-option';
-import { NimbleDrawerModule } from '@ni/nimble-angular/drawer';
-import { NimbleSpinnerModule } from '@ni/nimble-angular/spinner';
-import { NimbleBannerModule } from '@ni/nimble-angular/banner';
+// Nimble modules — import component modules from @ni/nimble-angular
+import {
+  NimbleThemeProviderModule,
+  NimbleTableModule,
+  NimbleTableColumnTextModule,
+  NimbleButtonModule,
+  NimbleTextFieldModule,
+  NimbleSelectModule,
+  NimbleListOptionModule,
+  NimbleDrawerModule,
+  NimbleSpinnerModule,
+  NimbleBannerModule,
+} from '@ni/nimble-angular';
+// Label providers are imported from dedicated subpaths
+import { NimbleLabelProviderCoreModule } from '@ni/nimble-angular/label-provider/core';
 
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
@@ -137,6 +141,7 @@ import { MyFeatureComponent } from './my-feature/my-feature.component';
     FormsModule,
     AppRoutingModule,
     NimbleThemeProviderModule,
+    NimbleLabelProviderCoreModule,
     NimbleTableModule,
     NimbleTableColumnTextModule,
     NimbleButtonModule,
@@ -156,6 +161,8 @@ import { MyFeatureComponent } from './my-feature/my-feature.component';
 })
 export class AppModule {}
 ```
+
+For Nimble form controls (`nimble-text-field`, `nimble-select`, etc.), bind with Angular forms APIs (`[(ngModel)]`, `[formControl]`, or `formControlName`) and use `(ngModelChange)` for value-change reactions. Avoid native control bindings like `[value]`, `(input)`, or `(change)` on Nimble elements.
 
 **Critical:** Provide `APP_BASE_HREF` via DI and **remove the `<base href="/">` tag from `index.html`**. SystemLink enforces a `base-uri 'self'` CSP directive; the `<base>` element violates it.
 
@@ -203,7 +210,139 @@ In `angular.json`, disable critical CSS inlining (the Beasties optimizer injects
 
 ---
 
-## Step 7: Call SystemLink APIs
+## Step 7: Configure fonts and styling with Nimble tokens
+
+Nimble fonts (Source Sans Pro, Noto Serif) must be explicitly imported in your global styles. Split your styling tokens into two groups:
+
+1. Theme-independent aliases such as fonts and spacing belong in `src/styles.scss` on `:root`
+2. Theme-aware aliases such as colors and shadows must be defined on `nimble-theme-provider`, because Nimble resolves its theme tokens there rather than on `:root`
+
+### Import Nimble fonts (required)
+
+```scss
+/* src/styles.scss */
+
+/* Import Nimble fonts (Source Sans Pro, Noto Serif) */
+@use '@ni/nimble-angular/styles/fonts' as *;
+
+/* Theme-independent aliases only. */
+:root {
+  /* Typography - map to Nimble's named font tokens */
+  --sl-app-font-body: var(--ni-nimble-body-font);
+  --sl-app-font-body-emphasized: var(--ni-nimble-body-emphasized-font);
+  --sl-app-font-title: var(--ni-nimble-title-font);
+  --sl-app-font-title-plus-1: var(--ni-nimble-title-plus-1-font);
+  --sl-app-font-control-label: var(--ni-nimble-control-label-font);
+  --sl-app-font-group-header: var(--ni-nimble-group-header-font);
+
+  --sl-app-space-1: var(--ni-nimble-small-padding, 4px);
+  --sl-app-space-2: var(--ni-nimble-medium-padding, 8px);
+  --sl-app-space-3: calc(var(--ni-nimble-small-padding, 4px) * 3);
+  --sl-app-space-4: var(--ni-nimble-standard-padding, 16px);
+  --sl-app-space-6: var(--ni-nimble-large-padding, 24px);
+}
+
+/* Apply body defaults */
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  font: var(--sl-app-font-body);
+}
+
+h1 { font: var(--sl-app-font-title-plus-1); }
+h2 { font: var(--sl-app-font-title); }
+h3, h4, h5, h6 { font: var(--sl-app-font-body-emphasized); }
+```
+
+Define theme-aware aliases on the root `nimble-theme-provider` instead of `:root`:
+
+```scss
+/* src/app/app.component.scss */
+
+:host {
+  display: block;
+  height: 100vh;
+}
+
+nimble-theme-provider {
+  display: block;
+  height: 100%;
+  background: var(--ni-nimble-application-background-color);
+  color: var(--ni-nimble-body-font-color);
+
+  --sl-app-color-bg: var(--ni-nimble-application-background-color);
+  --sl-app-color-surface: var(--ni-nimble-section-background-color);
+  --sl-app-color-surface-alt: var(--ni-nimble-header-background-color);
+  --sl-app-color-border: var(--ni-nimble-border-color);
+  --sl-app-color-border-strong: var(--ni-nimble-popup-border-color);
+  --sl-app-color-text: var(--ni-nimble-body-font-color);
+  --sl-app-color-text-muted: var(--ni-nimble-placeholder-font-color);
+  --sl-app-color-accent: var(--ni-nimble-button-fill-primary-color);
+  --sl-app-color-accent-contrast: var(--ni-nimble-button-primary-font-color);
+  --sl-app-color-success: var(--ni-nimble-pass-color);
+  --sl-app-shadow-1: var(--ni-nimble-elevation-1-box-shadow);
+  --sl-app-shadow-2: var(--ni-nimble-elevation-2-box-shadow);
+}
+```
+
+Do not add literal color fallbacks to theme-aware aliases. If you write `var(--ni-nimble-application-background-color, #fff)` into your app token layer, you make it too easy to miss a broken theme hookup and accidentally freeze the palette to a light-only fallback.
+
+### Use semantic tokens in component SCSS
+
+Instead of hard-coded colors/sizes, reference the semantic `--sl-app-*` variables:
+
+```scss
+// src/app/my-feature/my-feature.component.scss
+
+.card {
+  padding: var(--sl-app-space-4);
+  border: 1px solid var(--sl-app-color-border);
+  background: var(--sl-app-color-surface);
+  border-radius: var(--sl-app-space-1);
+  transition: box-shadow var(--ni-nimble-medium-delay, 0.15s) ease;
+
+  &:hover {
+    box-shadow: var(--sl-app-shadow-2);
+  }
+}
+
+.card-title {
+  font: var(--sl-app-font-body-emphasized);
+  color: var(--sl-app-color-text);
+}
+
+.card-meta {
+  font: var(--sl-app-font-control-label);
+  color: var(--sl-app-color-text-muted);
+}
+```
+
+If you want compile-time token values in SCSS, you can also import Nimble's token variables:
+
+```scss
+@use '@ni/nimble-angular/styles/tokens' as *;
+
+.my-element {
+  color: $ni-nimble-body-font-color;
+}
+```
+
+### Why this pattern?
+
+1. **Themability** — All colors flow through Nimble's theme-aware tokens. If Nimble changes color ramps or adds dark mode, your app automatically inherits it.
+2. **Consistency** — Using Nimble's canonical fonts (Source Sans Pro for UI, Noto Serif for headings) ensures your app feels native to SystemLink.
+3. **Typography scales** — Nimble defines font sizes, weights, and line heights per role (body, titles, labels, headings). Reuse them rather than inventing your own.
+4. **Correct token resolution** — Color and shadow aliases must live on `nimble-theme-provider`; defining them on `:root` can leave a hosted app stuck on the wrong palette even when the provider's `theme` attribute changes.
+5. **Responsive spacing** — Nimble's padding tokens scale predictably; build layouts that adapt to different screen sizes by composing space variables.
+
+### Available Nimble tokens
+
+See [Nimble's theme-aware tokens documentation](https://nimble.ni.dev/storybook/index.html?path=/docs/tokens-theme-aware-tokens--docs) for a complete token reference (colors, dimensions, shadows, delays, etc.).
+
+---
+
+## Step 8: Call SystemLink APIs
 
 ### Configure the client at runtime
 
@@ -262,26 +401,94 @@ const BASE_URL = `${window.location.origin}/nifile`;   // File Ingestion
 
 ---
 
-## Step 8: App template pattern
+## Step 9: App template pattern
 
 ```typescript
 // src/app/app.component.ts
-import { Component } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 
 @Component({
   selector: 'app-root',
   template: `
-    <nimble-theme-provider theme="light">
+    <nimble-theme-provider [theme]="currentTheme">
+      <nimble-label-provider-core withDefaults></nimble-label-provider-core>
       <router-outlet></router-outlet>
     </nimble-theme-provider>
   `,
 })
-export class AppComponent {}
+export class AppComponent implements OnInit, OnDestroy {
+  currentTheme: 'light' | 'dark' = 'light';
+  private themeObserver: MutationObserver | null = null;
+
+  ngOnInit(): void {
+    this.currentTheme = this.detectInitialTheme();
+    this.watchParentTheme();
+  }
+
+  ngOnDestroy(): void {
+    this.themeObserver?.disconnect();
+  }
+
+  private detectInitialTheme(): 'light' | 'dark' {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const queryTheme = params.get('theme');
+      if (queryTheme === 'light' || queryTheme === 'dark') return queryTheme;
+    } catch {}
+
+    try {
+      if (window.parent !== window) {
+        const parentProvider = window.parent.document.querySelector('nimble-theme-provider');
+        const parentTheme = parentProvider?.getAttribute('theme');
+        if (parentTheme === 'light' || parentTheme === 'dark') return parentTheme;
+      }
+    } catch {}
+
+    try {
+      const savedTheme = localStorage.getItem('sl_app_theme');
+      if (savedTheme === 'light' || savedTheme === 'dark') return savedTheme;
+    } catch {}
+
+    try {
+      if (window.matchMedia?.('(prefers-color-scheme: dark)').matches) return 'dark';
+    } catch {}
+
+    return 'light';
+  }
+
+  private watchParentTheme(): void {
+    try {
+      if (window.parent === window) return;
+      const parentProvider = window.parent.document.querySelector('nimble-theme-provider');
+      if (!parentProvider) return;
+
+      this.themeObserver = new MutationObserver(() => {
+        const parentTheme = parentProvider.getAttribute('theme');
+        if (parentTheme === 'light' || parentTheme === 'dark') {
+          this.currentTheme = parentTheme;
+        }
+      });
+
+      this.themeObserver.observe(parentProvider, {
+        attributes: true,
+        attributeFilter: ['theme'],
+      });
+    } catch {}
+  }
+}
+```
+
+If the app is hosted by SystemLink inside a same-origin iframe, this parent-provider sync keeps the embedded app aligned with the shell when the user switches between light and dark mode.
+
+For breadcrumb navigation in routed Angular apps, use `nimbleRouterLink` on `nimble-breadcrumb-item` (not click handlers):
+
+```html
+<nimble-breadcrumb-item nimbleRouterLink="/catalog">Catalog</nimble-breadcrumb-item>
 ```
 
 ---
 
-## Step 9: Build
+## Step 10: Build
 
 ```bash
 node_modules/.bin/ng build --configuration production --output-path dist/<app-name>
@@ -301,7 +508,7 @@ If you hit budget errors, increase limits in `angular.json`:
 
 ---
 
-## Step 10: Deploy with slcli
+## Step 11: Deploy with slcli
 
 ```bash
 # First deploy — no existing webapp ID
@@ -325,12 +532,25 @@ Save the returned webapp ID — you'll need it for every subsequent redeploy.
 | CSP `base-uri` error | `<base href="/">` in index.html | Remove `<base>` tag; provide `APP_BASE_HREF` via DI |
 | NG04002 / white screen | PathLocationStrategy can't resolve sub-path | `useHash: true` in RouterModule |
 | CSP `unsafe-inline` error | Beasties injects `onload` in style tags | `inlineCritical: false` in angular.json optimization |
+| App stays light inside dark SystemLink shell | Theme-aware aliases defined on `:root` or embedded app not watching host provider | Define color/shadow aliases on `nimble-theme-provider`; sync `currentTheme` from parent provider |
+| `theme="dark"` is set but colors still look light | Checked the attribute only, not the resolved tokens | Inspect `getComputedStyle(themeProvider).getPropertyValue('--ni-nimble-application-background-color')` in the hosted iframe |
 | CORS / status 0 | `basePath` points to different origin | Set `basePath = window.location.origin + '/service-prefix'` |
 | 404 on API calls | Missing service prefix in base URL | e.g., `/nitag` not just `window.location.origin` |
 | Table rows empty despite correct response | `projection` flattens nested objects | Remove `projection` from query body |
 | `TableRecord` type error | Row type missing index signature | Add `[key: string]: FieldValue \| undefined` |
 | Button appearance invalid | Wrong value for `appearance` attr | Use `appearance="block" appearance-variant="accent"` |
 | `ng build` exits 130 / truncated | Terminal heredoc issue in VS Code | Run build as background process: `nohup ng build ... > /tmp/build.log 2>&1 &` |
+
+### Hosted theme validation recipe
+
+When validating a deployed SystemLink webapp, prefer checking the hosted instance rather than only local dev:
+
+1. Open the webapp inside SystemLink so you can inspect the shell and embedded iframe together
+2. Verify both parent and iframe expose a `nimble-theme-provider`
+3. Compare resolved token values, not just attributes, for example `--ni-nimble-application-background-color`, `--ni-nimble-header-background-color`, and `--ni-nimble-body-font-color`
+4. Scan component SCSS for hard-coded color literals and replace them with Nimble tokens or local semantic aliases
+
+If the host and iframe are same-origin, Playwright or DevTools can inspect `iframe.contentDocument` directly.
 
 ---
 
@@ -353,19 +573,14 @@ See `references/systemlink-services.md` for full API details.
 
 ## Key imports reference
 
-| Component | Import path |
-|-----------|-------------|
-| `NimbleThemeProviderModule` | `@ni/nimble-angular` |
-| `NimbleTableModule` | `@ni/nimble-angular/table` |
-| `NimbleTableColumnTextModule` | `@ni/nimble-angular/table-column/text` |
-| `NimbleTableColumnNumberTextModule` | `@ni/nimble-angular/table-column/number-text` |
-| `NimbleTableColumnDateTextModule` | `@ni/nimble-angular/table-column/date-text` |
-| `NimbleButtonModule` | `@ni/nimble-angular/button` |
-| `NimbleTextFieldModule` | `@ni/nimble-angular/text-field` |
-| `NimbleSelectModule` + `NimbleListOptionModule` | `@ni/nimble-angular/select`, `@ni/nimble-angular/list-option` |
-| `NimbleDrawerModule` | `@ni/nimble-angular/drawer` |
-| `NimbleSpinnerModule` | `@ni/nimble-angular/spinner` |
-| `NimbleBannerModule` | `@ni/nimble-angular/banner` |
-| `NimbleCardButtonModule` | `@ni/nimble-angular/card-button` |
+| Item | Import path |
+|------|-------------|
+| Component modules (theme provider, buttons, inputs, select, list-option, drawer, spinner, banner, table) | `@ni/nimble-angular` |
+| Label provider core module | `@ni/nimble-angular/label-provider/core` |
+| Label provider rich text module | `@ni/nimble-angular/label-provider/rich-text` |
+| Label provider table module | `@ni/nimble-angular/label-provider/table` |
+| Fonts styles entrypoint (`@use`) | `@ni/nimble-angular/styles/fonts` |
+| Tokens styles entrypoint (`@use`) | `@ni/nimble-angular/styles/tokens` |
+| Card module (if used) | `@ni/nimble-angular/card` |
 
 See `references/nimble-angular.md` for template usage of each component.

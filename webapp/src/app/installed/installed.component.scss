@@ -2,46 +2,50 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 0;
+  gap: var(--sl-app-space-3);
+  padding: var(--sl-app-space-4) 0;
 
   h2 {
     margin: 0;
+    font: var(--sl-app-font-title);
   }
 }
 
 .loading-container {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 48px;
   justify-content: center;
-  color: #666;
+  gap: var(--sl-app-space-3);
+  padding: calc(var(--sl-app-space-6) * 2);
+  color: var(--sl-app-color-text-muted);
 }
 
 .empty-state {
   text-align: center;
-  padding: 48px;
-  color: #888;
+  padding: calc(var(--sl-app-space-6) * 2);
+  color: var(--sl-app-color-text-muted);
 }
 
 .installed-list {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: var(--sl-app-space-2);
 }
 
 .installed-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 16px;
-  border: 1px solid #e0e0e0;
-  border-radius: 4px;
+  gap: var(--sl-app-space-3);
+  padding: var(--sl-app-space-3) var(--sl-app-space-4);
+  border: 1px solid var(--sl-app-color-border);
+  border-radius: var(--sl-app-space-1);
   cursor: pointer;
-  transition: background 0.1s ease;
+  transition: background var(--ni-nimble-small-delay, 0.075s) ease;
+  background: var(--sl-app-color-surface);
 
   &:hover {
-    background: #f9f9f9;
+    background: var(--sl-app-color-surface-alt);
   }
 }
 
@@ -49,29 +53,38 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
 }
 
 .row-name {
-  font-weight: 600;
-  font-size: 14px;
+  font: var(--sl-app-font-body-emphasized);
 }
 
 .row-version {
-  font-size: 13px;
-  color: #555;
+  font: var(--sl-app-font-body);
+  color: var(--sl-app-color-text);
 }
 
 .upgrade-badge {
-  color: #0d6efd;
-  font-weight: 600;
+  color: var(--sl-app-color-accent);
+  font: var(--sl-app-font-body-emphasized);
 }
 
 .row-meta {
-  font-size: 12px;
-  color: #888;
+  font: var(--sl-app-font-control-label);
+  color: var(--sl-app-color-text-muted);
 }
 
 .row-actions {
   display: flex;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: var(--sl-app-space-2);
+}
+
+@media (max-width: 768px) {
+  .installed-header,
+  .installed-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }

@@ -9,7 +9,7 @@
 
 <ng-container *ngIf="!loading && pkg">
   <nimble-breadcrumb>
-    <nimble-breadcrumb-item (click)="goBack()" style="cursor:pointer">Catalog</nimble-breadcrumb-item>
+    <nimble-breadcrumb-item nimbleRouterLink="/catalog">Catalog</nimble-breadcrumb-item>
     <nimble-breadcrumb-item>{{ pkg.displayName }}</nimble-breadcrumb-item>
   </nimble-breadcrumb>
 

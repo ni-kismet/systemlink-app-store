@@ -24,6 +24,7 @@ import {
   NimbleBreadcrumbItemModule,
   NimbleAnchorButtonModule,
 } from '@ni/nimble-angular';
+import { NimbleLabelProviderCoreModule } from '@ni/nimble-angular/label-provider/core';
 import { NimbleCardModule } from '@ni/nimble-angular/card';
 
 import { AppRoutingModule } from './app-routing-module';
@@ -52,6 +53,7 @@ import { PermissionBannerComponent } from './shared/permission-banner.component'
     FormsModule,
     AppRoutingModule,
     NimbleThemeProviderModule,
+    NimbleLabelProviderCoreModule,
     NimbleButtonModule,
     NimbleTextFieldModule,
     NimbleSelectModule,

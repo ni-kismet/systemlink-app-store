@@ -1,60 +1,58 @@
 .app-card {
   display: flex;
-  gap: 12px;
-  padding: 16px;
-  border: 1px solid var(--ni-nimble-border-color, #e0e0e0);
-  border-radius: 4px;
+  gap: var(--sl-app-space-3);
+  padding: var(--sl-app-space-4);
+  border: 1px solid var(--ni-nimble-card-border-color);
+  border-radius: var(--sl-app-space-1);
   cursor: pointer;
-  transition: box-shadow 0.15s ease;
-  background: var(--ni-nimble-header-background-color, #fff);
+  transition: box-shadow var(--ni-nimble-medium-delay, 0.15s) ease;
+  background: var(--ni-nimble-section-background-color);
 
   &:hover {
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+    box-shadow: var(--ni-nimble-elevation-2-box-shadow);
   }
 }
 
 .card-icon {
   flex-shrink: 0;
-  width: 48px;
-  height: 48px;
+  width: 3rem;
+  height: 3rem;
 }
 
 .icon-img {
-  width: 48px;
-  height: 48px;
+  width: 3rem;
+  height: 3rem;
   object-fit: contain;
-  border-radius: 4px;
+  border-radius: var(--sl-app-space-1);
 }
 
 .icon-placeholder {
-  width: 48px;
-  height: 48px;
+  width: 3rem;
+  height: 3rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 22px;
-  font-weight: 600;
-  color: #fff;
-  background: #0d6efd;
-  border-radius: 4px;
+  font: var(--sl-app-font-title);
+  color: var(--ni-nimble-button-primary-font-color);
+  background: var(--ni-nimble-button-fill-primary-color);
+  border-radius: var(--sl-app-space-1);
 }
 
 .card-body {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--sl-app-space-1);
   min-width: 0;
 }
 
 .card-header {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--sl-app-space-2);
 }
 
 .card-title {
-  font-weight: 600;
-  font-size: 14px;
+  font: var(--sl-app-font-body-emphasized);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -62,30 +60,30 @@
 
 .upgrade-badge,
 .installed-badge {
-  font-size: 11px;
+  font: var(--sl-app-font-control-label);
   padding: 1px 6px;
   border-radius: 3px;
   white-space: nowrap;
 }
 
 .upgrade-badge {
-  background: #0d6efd;
-  color: #fff;
+  background: var(--ni-nimble-button-fill-primary-color);
+  color: var(--ni-nimble-button-primary-font-color);
 }
 
 .installed-badge {
-  background: #e8e8e8;
-  color: #333;
+  background: var(--ni-nimble-header-background-color);
+  color: var(--ni-nimble-body-font-color);
 }
 
 .card-author {
-  font-size: 12px;
-  color: #666;
+  font: var(--sl-app-font-control-label);
+  color: var(--ni-nimble-placeholder-font-color);
 }
 
 .card-description {
-  font-size: 13px;
-  color: #444;
+  font: var(--sl-app-font-body);
+  color: var(--ni-nimble-body-font-color);
   line-height: 1.4;
 }
 
@@ -93,17 +91,16 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 4px;
+  margin-top: var(--sl-app-space-1);
 }
 
 .card-category {
-  font-size: 11px;
+  font: var(--sl-app-font-group-header);
+  color: var(--ni-nimble-group-header-font-color);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: #888;
 }
 
 .card-version {
-  font-size: 11px;
-  color: #888;
+  font: var(--sl-app-font-control-label);
+  color: var(--ni-nimble-control-label-font-color);
 }

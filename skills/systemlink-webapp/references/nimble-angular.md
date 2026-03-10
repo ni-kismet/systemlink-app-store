@@ -5,12 +5,20 @@
 Wrap your entire app. Always place at the root component level.
 
 ```html
-<nimble-theme-provider theme="light">
+<nimble-theme-provider [theme]="currentTheme">
   <router-outlet></router-outlet>
 </nimble-theme-provider>
 ```
 
 Themes: `light`, `dark`, `color` (high contrast).
+
+For SystemLink-hosted apps, do not hard-code `theme="light"` unless the user explicitly wants a fixed theme. The common pattern is:
+
+1. Detect initial theme from `?theme=...`, then the parent frame's `nimble-theme-provider`, then local storage, then system preference
+2. If the app is hosted in a same-origin iframe, watch the parent provider's `theme` attribute with `MutationObserver` and update `currentTheme`
+3. Define theme-aware CSS aliases such as colors and shadows on `nimble-theme-provider`, not on `:root`, so token resolution follows the active Nimble theme
+
+When debugging theme mismatches, inspect resolved token values on the provider with `getComputedStyle(provider).getPropertyValue('--ni-nimble-application-background-color')` rather than only checking the `theme` attribute.
 
 ---
 
