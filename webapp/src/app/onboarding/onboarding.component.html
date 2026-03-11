@@ -6,6 +6,20 @@
       {{ error }}
     </nimble-banner>
 
+    <!-- Feed conflict: already exists -->
+    <nimble-banner *ngIf="showFeedConflict" severity="warning" [open]="true">
+      <span>A feed from this URL already exists<span *ngIf="existingFeedName"> ("{{ existingFeedName }}")</span>.
+        You can use the existing feed or replace it with a fresh replication.</span>
+    </nimble-banner>
+    <div *ngIf="showFeedConflict" class="conflict-actions">
+      <nimble-button appearance="outline" (click)="useExistingFeed()" [disabled]="loading">
+        Use Existing Feed
+      </nimble-button>
+      <nimble-button appearance="ghost" (click)="replaceExistingFeed()" [disabled]="loading">
+        {{ loading ? 'Replacing…' : 'Replace Feed' }}
+      </nimble-button>
+    </div>
+
     <!-- Step 1: Connect Feed -->
     <section class="step" [class.active]="step === 1" [class.done]="step > 1">
       <div class="step-header">
@@ -28,20 +42,37 @@
       </div>
     </section>
 
-    <!-- Step 2: Save Feed Config -->
+    <!-- Step 2: Optional additional feed -->
     <section class="step" [class.active]="step === 2" [class.done]="step > 2">
       <div class="step-header">
         <span class="step-number" [class.completed]="step > 2">2</span>
-        <span class="step-title">Save feed configuration</span>
+        <span class="step-title">Add another feed (optional)</span>
       </div>
       <div *ngIf="step === 2" class="step-body">
         <p>
-          Register the replicated feed so the App Store can discover and
-          install packages from it.
+          The main App Store feed has been registered. You can optionally
+          add an additional feed now — for example, an internal feed hosted
+          within your organisation.
         </p>
-        <nimble-button appearance="outline" (click)="saveFeedConfig()" [disabled]="loading">
-          {{ loading ? 'Saving…' : 'Save Configuration' }}
-        </nimble-button>
+        <label class="field-label">Feed URL</label>
+        <nimble-text-field
+          [(ngModel)]="optionalFeedUrl"
+          placeholder="https://…">
+        </nimble-text-field>
+        <label class="field-label">Display Name (optional)</label>
+        <nimble-text-field
+          [(ngModel)]="optionalFeedName"
+          placeholder="My Internal Feed">
+        </nimble-text-field>
+        <div class="step-actions">
+          <nimble-button appearance="outline" (click)="addOptionalFeed()" [disabled]="addingOptional || !optionalFeedUrl.trim()">
+            {{ addingOptional ? 'Adding…' : 'Replicate &amp; Add Feed' }}
+          </nimble-button>
+          <nimble-button appearance="ghost" (click)="skipAdditionalFeed()" [disabled]="addingOptional">
+            Skip
+          </nimble-button>
+        </div>
+        <p class="hint">You can add more feeds at any time from the <strong>Settings</strong> tab.</p>
       </div>
     </section>
 

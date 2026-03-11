@@ -16,6 +16,16 @@ export class OnboardingComponent {
   error = '';
   loading = false;
 
+  // Feed-already-exists conflict state
+  existingFeedId = '';
+  existingFeedName = '';
+  showFeedConflict = false;
+
+  // Step 2 – optional additional feed
+  optionalFeedUrl = '';
+  optionalFeedName = '';
+  addingOptional = false;
+
   constructor(
     private appStoreService: AppStoreService,
     private router: Router,
@@ -25,37 +35,100 @@ export class OnboardingComponent {
     if (this.loading || !this.feedUrl.trim()) return;
     this.loading = true;
     this.error = '';
+    this.showFeedConflict = false;
     try {
       const result = await this.appStoreService.replicateFeed(this.feedUrl.trim());
       this.feedId = result.id ?? result.feedId ?? '';
-      this.step = 2;
+      await this.saveMainFeedAndAdvance();
     } catch (e: any) {
-      this.error = `Feed replication failed: ${e.message}`;
+      const msg = typeof e.message === 'string' ? e.message : '';
+      // Detect "feed already exists" style errors and offer to use the existing feed.
+      if (msg.toLowerCase().includes('already') || msg.toLowerCase().includes('duplicate') || msg.toLowerCase().includes('conflict')) {
+        const existing = await this.appStoreService.findFeedBySourceUrl(this.feedUrl.trim());
+        if (existing) {
+          this.existingFeedId = existing.id;
+          this.existingFeedName = existing.name;
+          this.showFeedConflict = true;
+        } else {
+          this.error = `Feed replication failed: ${msg}`;
+        }
+      } else {
+        this.error = `Feed replication failed: ${msg}`;
+      }
     } finally {
       this.loading = false;
     }
   }
 
-  async saveFeedConfig(): Promise<void> {
-    if (this.loading || !this.feedId) return;
+  /** User chose to use the existing feed that was already replicated. */
+  async useExistingFeed(): Promise<void> {
     this.loading = true;
     this.error = '';
+    this.showFeedConflict = false;
     try {
-      const feedConfig: FeedConfig = {
-        name: FEED_NAME,
-        url: this.feedUrl.trim(),
-        feedId: this.feedId,
-      };
-      const existing = await this.appStoreService.loadFeedConfigs();
-      // Replace any existing entry for this feedId, then append the new one.
-      const updated = [...existing.filter(f => f.feedId !== this.feedId), feedConfig];
-      await this.appStoreService.saveFeedConfigs(updated);
-      this.step = 3;
+      this.feedId = this.existingFeedId;
+      await this.saveMainFeedAndAdvance();
     } catch (e: any) {
       this.error = `Failed to save feed configuration: ${e.message}`;
     } finally {
       this.loading = false;
     }
+  }
+
+  /** User chose to replace the existing feed with a fresh replication. */
+  async replaceExistingFeed(): Promise<void> {
+    this.loading = true;
+    this.error = '';
+    this.showFeedConflict = false;
+    try {
+      await this.appStoreService.deleteReplicatedFeed(this.existingFeedId);
+      const result = await this.appStoreService.replicateFeed(this.feedUrl.trim());
+      this.feedId = result.id ?? result.feedId ?? '';
+      await this.saveMainFeedAndAdvance();
+    } catch (e: any) {
+      this.error = `Failed to replace feed: ${e.message}`;
+    } finally {
+      this.loading = false;
+    }
+  }
+
+  private async saveMainFeedAndAdvance(): Promise<void> {
+    const mainFeedConfig: FeedConfig = {
+      name: FEED_NAME,
+      url: this.feedUrl.trim(),
+      feedId: this.feedId,
+    };
+    const existing = await this.appStoreService.loadFeedConfigs();
+    const updated = [...existing.filter(f => f.feedId !== this.feedId), mainFeedConfig];
+    await this.appStoreService.saveFeedConfigs(updated);
+    this.step = 2;
+  }
+
+  async addOptionalFeed(): Promise<void> {
+    if (this.addingOptional || !this.optionalFeedUrl.trim()) return;
+    this.addingOptional = true;
+    this.error = '';
+    try {
+      const result = await this.appStoreService.replicateFeed(this.optionalFeedUrl.trim());
+      const optFeedId = result.id ?? result.feedId ?? '';
+      const feedConfig: FeedConfig = {
+        name: this.optionalFeedName.trim() || 'Additional Feed',
+        url: this.optionalFeedUrl.trim(),
+        feedId: optFeedId,
+      };
+      const existing = await this.appStoreService.loadFeedConfigs();
+      const updated = [...existing.filter(f => f.feedId !== optFeedId), feedConfig];
+      await this.appStoreService.saveFeedConfigs(updated);
+      this.step = 3;
+    } catch (e: any) {
+      this.error = `Failed to add feed: ${e.message}`;
+    } finally {
+      this.addingOptional = false;
+    }
+  }
+
+  skipAdditionalFeed(): void {
+    this.step = 3;
   }
 
   goToCatalog(): void {

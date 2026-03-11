@@ -156,7 +156,9 @@ The feed architecture supports **OpenPGP signing** of the `Packages` index (stan
 
 ### 3.5 Feed discovery
 
-The App Store feed is identified by a well-known feed name: `"SystemLink App Store"`. Both the webapp and CLI discover the feed by listing all feeds (`GET /nifeed/v1/feeds`) and finding the one with this name. The feed ID and configuration are stored alongside the install manifest in the Tag Service (see §8).
+Feed IDs and source URLs are stored in the App Store webapp's own `appstore.feeds` property (see §8.1). Both the webapp and CLI read the registered feed list from there — no name-based lookup against the Feed Service is performed.
+
+For the CLI, `slcli appstore feed add` writes the feed ID returned by the Feed Service into the local config cache (`~/.config/slcli/appstore.json`) at registration time. Subsequent commands use the cached ID directly. There is no fallback scan of all feeds.
 
 ---
 
@@ -197,7 +199,7 @@ If permissions are missing, display a `<nimble-banner severity="warning">` expla
 
 1. Webapp loads → checks Web Application permissions, shows warning banner if insufficient
 2. Reads feed config from the App Store webapp's own `appstore.feeds` property via `getWebapp(ownId)`
-3. If no feed config found, falls back to `getNifeedV1Feeds()` discovery; if still not found, redirects to onboarding
+3. If no feed config found (property absent or empty), redirects to onboarding wizard — no name-based Feed Service scan
 4. Calls `getNifeedV1FeedsByFeedIdPackages()` to list all packages from the configured feed
 5. Filters packages to `UserVisible: yes` and `AppStoreType: webapp` (or `Section: WebApps`)
 6. Collapses multiple feed entries with the same `Package` name to the latest semantic version so the catalog shows one card per app
@@ -205,7 +207,7 @@ If permissions are missing, display a `<nimble-banner severity="warning">` expla
 8. User clicks card → detail drawer/page with full info, base64-decoded screenshot
 9. User clicks "Install" → choose target workspace(s) → for each workspace:
    a. Download `.nipkg` from feed via `getNifeedV1FeedsByFeedIdFilesByFileName()`
-   b. Create a new webapp: `createWebapp({ name, workspace, properties })` where `properties` includes all `appstore.*` metadata (see §8)
+   b. Create a new webapp: `createWebapp({ name, workspace })`, then set `appstore.*` metadata properties via a separate `updateWebapp()` call (the WebApp Service rejects custom property keys on the create endpoint — see §8)
    c. Upload the `.nipkg` directly: `updateContent({ id }, nipkgBlob)` — no extraction needed
 10. Status updates via banner confirmation; installed status refreshed by re-listing webapps
 
@@ -231,27 +233,27 @@ If permissions are missing, display a `<nimble-banner severity="warning">` expla
 
 ### 4.4 API surface needed
 
-| Operation                 | Service        | SDK client         | SDK function                                                              | Endpoint                                           |
-| ------------------------- | -------------- | ------------------ | ------------------------------------------------------------------------- | -------------------------------------------------- |
-| List feeds (discovery)    | Feed Service   | `#feeds`           | `getNifeedV1Feeds()`                                                      | `GET /nifeed/v1/feeds`                             |
-| List feed packages        | Feed Service   | `#feeds`           | `getNifeedV1FeedsByFeedIdPackages()`                                      | `GET /nifeed/v1/feeds/{feedId}/packages`           |
-| Get single package        | Feed Service   | `#feeds`           | `getNifeedV1PackagesByPackageId()`                                        | `GET /nifeed/v1/packages/{packageId}`              |
-| Download Packages index   | Feed Service   | `#feeds`           | `getNifeedV1FeedsByFeedIdFilesPackages()`                                 | `GET /nifeed/v1/feeds/{feedId}/files/Packages`     |
-| Download package file     | Feed Service   | `#feeds`           | `getNifeedV1FeedsByFeedIdFilesByFileName()`                               | `GET /nifeed/v1/feeds/{feedId}/files/{fileName}`   |
-| Trigger feed sync         | Feed Service   | `#feeds`           | `postNifeedV1ReplicateFeed()`                                             | `POST /nifeed/v1/replicate-feed`                   |
-| Check for updates         | Feed Service   | `#feeds`           | `postNifeedV1FeedsByFeedIdCheckForUpdates()`                              | `POST /nifeed/v1/feeds/{feedId}/check-for-updates` |
-| Apply updates             | Feed Service   | `#feeds`           | `postNifeedV1FeedsByFeedIdApplyUpdates()`                                 | `POST /nifeed/v1/feeds/{feedId}/apply-updates`     |
-| Create webapp (metadata)  | WebApp Service | `#web-application` | `createWebapp({ body: { name, workspace, properties } })`                 | `POST /niapp/v1/webapps`                           |
-| Upload `.nipkg` to webapp | WebApp Service | `#web-application` | `updateContent({ path: { id }, body: nipkgBlob })`                        | `PUT /niapp/v1/webapps/{id}/content`               |
-| List installed webapps    | WebApp Service | `#web-application` | `listWebapps({ query: { workspace } })`                                   | `GET /niapp/v1/webapps`                            |
-| Query webapps (advanced)  | WebApp Service | `#web-application` | `query({ body: { filter, take, orderBy } })`                              | `POST /niapp/v1/query-webapps`                     |
-| Get webapp details        | WebApp Service | `#web-application` | `getWebapp({ path: { id } })`                                             | `GET /niapp/v1/webapps/{id}`                       |
-| Update webapp metadata    | WebApp Service | `#web-application` | `updateWebapp({ path: { id }, body })`                                    | `PUT /niapp/v1/webapps/{id}`                       |
-| Get webapp details        | WebApp Service | `#web-application` | `getWebapp({ path: { id } })`                                             | `GET /niapp/v1/webapps/{id}`                       |
-| Delete a webapp           | WebApp Service | `#web-application` | `deleteWebapp({ path: { id } })`                                          | `DELETE /niapp/v1/webapps/{id}`                    |
-| Read feed config          | WebApp Service | `#web-application` | `getWebapp({ path: { id } })` then read `properties['appstore.feeds']`    | `GET /niapp/v1/webapps/{appStoreId}`               |
-| Save feed config          | WebApp Service | `#web-application` | `updateWebapp({ path: { id }, body: { properties } })`                    | `PUT /niapp/v1/webapps/{appStoreId}`               |
-| Discover installed apps   | WebApp Service | `#web-application` | `listWebapps()` paginated, filter by `properties['appstore.packageName']` | `GET /niapp/v1/webapps`                            |
+| Operation                 | Service        | SDK client         | SDK function                                                                                                                        | Endpoint                                                |
+| ------------------------- | -------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| List feeds (discovery)    | Feed Service   | `#feeds`           | `getNifeedV1Feeds()`                                                                                                                | `GET /nifeed/v1/feeds`                                  |
+| List feed packages        | Feed Service   | `#feeds`           | `getNifeedV1FeedsByFeedIdPackages()`                                                                                                | `GET /nifeed/v1/feeds/{feedId}/packages`                |
+| Get single package        | Feed Service   | `#feeds`           | `getNifeedV1PackagesByPackageId()`                                                                                                  | `GET /nifeed/v1/packages/{packageId}`                   |
+| Download Packages index   | Feed Service   | `#feeds`           | `getNifeedV1FeedsByFeedIdFilesPackages()`                                                                                           | `GET /nifeed/v1/feeds/{feedId}/files/Packages`          |
+| Download package file     | Feed Service   | `#feeds`           | `getNifeedV1FeedsByFeedIdFilesByFileName()`                                                                                         | `GET /nifeed/v1/feeds/{feedId}/files/{fileName}`        |
+| Trigger feed sync         | Feed Service   | `#feeds`           | `postNifeedV1ReplicateFeed()`                                                                                                       | `POST /nifeed/v1/replicate-feed`                        |
+| Check for updates         | Feed Service   | `#feeds`           | `postNifeedV1FeedsByFeedIdCheckForUpdates()`                                                                                        | `POST /nifeed/v1/feeds/{feedId}/check-for-updates`      |
+| Apply updates             | Feed Service   | `#feeds`           | `postNifeedV1FeedsByFeedIdApplyUpdates()`                                                                                           | `POST /nifeed/v1/feeds/{feedId}/apply-updates`          |
+| Create webapp             | WebApp Service | `#web-application` | `createWebapp({ body: { name, workspace } })` then `updateWebapp()` to set `appstore.*` properties (custom keys rejected on create) | `POST /niapp/v1/webapps` + `PUT /niapp/v1/webapps/{id}` |
+| Upload `.nipkg` to webapp | WebApp Service | `#web-application` | `updateContent({ path: { id }, body: nipkgBlob })`                                                                                  | `PUT /niapp/v1/webapps/{id}/content`                    |
+| List installed webapps    | WebApp Service | `#web-application` | `listWebapps({ query: { workspace } })`                                                                                             | `GET /niapp/v1/webapps`                                 |
+| Query webapps (advanced)  | WebApp Service | `#web-application` | `query({ body: { filter, take, orderBy } })`                                                                                        | `POST /niapp/v1/query-webapps`                          |
+| Get webapp details        | WebApp Service | `#web-application` | `getWebapp({ path: { id } })`                                                                                                       | `GET /niapp/v1/webapps/{id}`                            |
+| Update webapp metadata    | WebApp Service | `#web-application` | `updateWebapp({ path: { id }, body })`                                                                                              | `PUT /niapp/v1/webapps/{id}`                            |
+| Get webapp details        | WebApp Service | `#web-application` | `getWebapp({ path: { id } })`                                                                                                       | `GET /niapp/v1/webapps/{id}`                            |
+| Delete a webapp           | WebApp Service | `#web-application` | `deleteWebapp({ path: { id } })`                                                                                                    | `DELETE /niapp/v1/webapps/{id}`                         |
+| Read feed config          | WebApp Service | `#web-application` | `getWebapp({ path: { id } })` then read `properties['appstore.feeds']`                                                              | `GET /niapp/v1/webapps/{appStoreId}`                    |
+| Save feed config          | WebApp Service | `#web-application` | `updateWebapp({ path: { id }, body: { properties } })`                                                                              | `PUT /niapp/v1/webapps/{appStoreId}`                    |
+| Discover installed apps   | WebApp Service | `#web-application` | `listWebapps()` paginated, filter by `properties['appstore.packageName']`                                                           | `GET /niapp/v1/webapps`                                 |
 
 > **Note:** The WebApp Service accepts `.nipkg` files directly via `updateContent()` — no browser-side extraction is required. The `body` parameter accepts a `Blob | File`.
 
@@ -276,19 +278,25 @@ When the App Store webapp launches and finds no feed configuration in its own pr
 │                                                                  │
 │  Step 1 of 3 — Connect to the App Store feed                     │
 │                                                                  │
-│  The App Store needs to replicate the package feed from GitHub    │
-│  to your local SystemLink instance.                              │
+│  The App Store needs to replicate the package feed from the      │
+│  source URL into your local SystemLink instance.                 │
 │                                                                  │
 │  Feed URL: [https://<org>.github.io/systemlink-app-store/    ]   │
 │                                                                  │
 │  [  Replicate Feed  ]                                            │
 │                                                                  │
-│  Step 2 of 3 — Save feed configuration                          │
-│  Registers the feed in the App Store webapp's properties.        │
+│  Step 2 of 3 — Add another feed (optional)                       │
+│  The main App Store feed has been registered. You can optionally  │
+│  add an additional feed (e.g. an internal feed).                  │
 │                                                                  │
-│  [  Save Configuration  ]                                        │
+│  Feed URL: [                                                 ]   │
+│  Display Name (optional): [                                  ]   │
 │                                                                  │
-│  Step 3 of 3 — Done!                                             │
+│  [  Replicate & Add Feed  ]  [  Skip  ]                          │
+│                                                                  │
+│  You can add more feeds at any time from the Settings tab.        │
+│                                                                  │
+│  Step 3 of 3 — You're all set!                                   │
 │  Your App Store is ready. Browse apps and install them.           │
 │                                                                  │
 │  [  Go to Catalog  ]                                             │
@@ -298,9 +306,10 @@ When the App Store webapp launches and finds no feed configuration in its own pr
 The onboarding flow:
 
 1. **Pre-fills the GitHub feed URL** with the official App Store feed URL
-2. **Replicates the feed** on the user's behalf via `postNifeedV1ReplicateFeed()` — the user does not need to manually configure the Feed Service
-3. **Saves the feed configuration** by writing a `FeedConfig` entry to the App Store webapp's own `appstore.feeds` property via `updateWebapp()`
-4. **Redirects to the catalog** once setup is complete
+2. **Replicates the feed and auto-saves the configuration** — on successful replication via `postNifeedV1ReplicateFeed()`, the feed config is immediately written to the App Store webapp's `appstore.feeds` property via `updateWebapp()`. No separate "Save" step is needed.
+3. **Handles feed-already-exists conflicts** — if replication fails because a feed with the same URL already exists, the wizard offers two options: "Use Existing Feed" (adopt the existing feed ID) or "Replace Feed" (delete the old feed and re-replicate). In both cases the feed config is saved automatically.
+4. **Offers an optional additional feed** — Step 2 allows users to add another feed (e.g. an internal company feed) by providing a URL and optional display name. Users can also skip this step; additional feeds can always be added later from the Settings tab.
+5. **Redirects to the catalog** once setup is complete
 
 ### 4.7 Feed refresh
 
@@ -337,8 +346,7 @@ slcli appstore search <QUERY> [--source github|systemlink]
 slcli appstore install <PACKAGE_NAME> [--version TEXT] [--workspace NAME [NAME ...]]
     # Download the package from the feed, extract the webapp, and publish.
     # Supports installing to one or more workspaces in a single command.
-    # For notebooks: upload to the notebook service.
-    # Records installed version in the Tag Service manifest.
+    # Records install metadata as appstore.* properties on the created webapp (see §8.2).
 
 slcli appstore upgrade <PACKAGE_NAME> [--workspace NAME]
     # Upgrade to the latest version. Preserves the webapp ID.
@@ -349,7 +357,7 @@ slcli appstore upgrade --all [--workspace NAME]
 
 slcli appstore uninstall <PACKAGE_NAME> [--workspace NAME [NAME ...]]
     # Remove the webapp from specified workspaces (or all if --workspace not given).
-    # Clean up the Tag Service manifest entry.
+    # Deletes the webapp(s); appstore.* properties are removed along with the webapp.
 
 slcli appstore workspaces <PACKAGE_NAME>
     # List workspaces where this app is currently installed.
@@ -399,17 +407,22 @@ slcli appstore validate <NIPKG_FILE>
 
 ### 5.2 Configuration
 
-The CLI caches the App Store feed ID locally in `~/.config/slcli/appstore.json` for performance, but the canonical install manifest and config live in the **Tag Service** (see §8) so both the CLI and webapp share the same state.
+The CLI stores a local config/cache at `~/.config/slcli/appstore.json`. This file is the CLI's own working state — it is not shared with the webapp.
 
 ```json
 {
-  "githubFeedUrl": "https://<org>.github.io/systemlink-app-store/",
-  "cachedFeedId": "db7c157d-ab22-4a09-aed6-47330fa4fa59",
+  "feeds": [
+    {
+      "name": "SystemLink App Store",
+      "url": "https://<org>.github.io/systemlink-app-store/",
+      "feedId": "db7c157d-ab22-4a09-aed6-47330fa4fa59"
+    }
+  ],
   "cachedAt": "2026-03-01T10:00:00Z"
 }
 ```
 
-The actual install manifest is stored in the Tag Service (see §8). The CLI reads/writes it the same way the webapp does.
+Installed app metadata (per-workspace webapp IDs, versions, timestamps) is stored as `appstore.*` properties on each webapp in the WebApp Service (see §8). The CLI reads from there for `status`, `workspaces`, `upgrade`, and `uninstall` — it does not maintain a local install manifest file.
 
 ---
 
@@ -533,24 +546,23 @@ A `.nipkg` package for the App Store is the standard NI Package format — a ZIP
 ### 7.2 Install flow
 
 1. CLI/webapp downloads `.nipkg` from the feed via `getNifeedV1FeedsByFeedIdFilesByFileName()`
-2. Creates a new webapp: `createWebapp({ body: { name, workspace, properties } })` — returns the new webapp `id`
+2. Creates a new webapp: `createWebapp({ body: { name, workspace } })` — returns the new webapp `id`. Custom `appstore.*` properties are set via a subsequent `updateWebapp()` call because the WebApp Service rejects custom property keys on the create endpoint.
 3. Uploads the `.nipkg` directly: `updateContent({ path: { id }, body: nipkgBlob })` — the WebApp Service handles extraction internally
-4. Records the mapping `packageName → webappId` in the workspace's install manifest tag (see §8)
+4. The created webapp's `appstore.*` properties (see §8.2) record the install metadata — no separate manifest storage is needed
 
 ### 7.3 Upgrade flow
 
 1. Download new version `.nipkg` from the feed
 2. Upload to the existing webapp: `updateContent({ path: { existingId }, body: nipkgBlob })` — the webapp ID is preserved
-3. Update version in the workspace's install manifest tag
+3. Update `appstore.version` and `appstore.updatedAt` properties on the existing webapp via `updateWebapp()`
 
 ### 7.4 Uninstall flow
 
-1. `deleteWebapp({ path: { id } })` — removes the webapp
-2. Remove entry from the workspace's install manifest tag
+1. `deleteWebapp({ path: { id } })` — removes the webapp and its `appstore.*` properties together; no separate cleanup required
 
 ---
 
-## 8. Install Manifest (Tag Service — Per Workspace)
+## 8. Install Manifest (WebApp Service Properties)
 
 App Store state is persisted entirely within the **WebApp Service** using the `properties` field available on every webapp resource. No separate storage service (Tag Service, database, etc.) is required.
 
@@ -584,17 +596,19 @@ Both the official curated feed and any customer-provided feeds (replicated from 
 
 When an app is installed through the App Store, the created webapp receives a set of well-known `appstore.*` properties that mark it as App Store-managed and record the install metadata:
 
-| Property key           | Description                                                      | Example                      |
-| ---------------------- | ---------------------------------------------------------------- | ---------------------------- |
-| `appstore.packageName` | App Store package identifier                                     | `mycompany-asset-dashboard`  |
-| `appstore.version`     | Installed semantic version                                       | `1.2.0`                      |
-| `appstore.type`        | Resource type                                                    | `webapp`                     |
-| `appstore.feedId`      | Feed Service feed ID this was installed from                     | `db7c157d-…`                 |
-| `appstore.feedUrl`     | Source URL of the feed                                           | `https://<org>.github.io/…/` |
-| `appstore.installedAt` | ISO 8601 install timestamp                                       | `2026-03-01T10:00:00Z`       |
-| `appstore.updatedAt`   | ISO 8601 last-upgrade timestamp (empty string if never upgraded) | `2026-03-09T14:30:00Z`       |
+| Property key           | Description                                                  | Example                      |
+| ---------------------- | ------------------------------------------------------------ | ---------------------------- |
+| `appstore.packageName` | App Store package identifier                                 | `mycompany-asset-dashboard`  |
+| `appstore.version`     | Installed semantic version                                   | `1.2.0`                      |
+| `appstore.type`        | Resource type                                                | `webapp`                     |
+| `appstore.feedId`      | Feed Service feed ID this was installed from                 | `db7c157d-…`                 |
+| `appstore.feedUrl`     | Source URL of the feed                                       | `https://<org>.github.io/…/` |
+| `appstore.installedAt` | ISO 8601 install timestamp                                   | `2026-03-01T10:00:00Z`       |
+| `appstore.updatedAt`   | ISO 8601 last-upgrade timestamp (absent until first upgrade) | `2026-03-09T14:30:00Z`       |
 
 The presence of `appstore.packageName` on a webapp is the signal that it was installed through the App Store.
+
+> **API constraint — empty string values:** The WebApp Service rejects property values that are empty strings. Properties that have no value (e.g., `appstore.updatedAt` before any upgrade) must be **omitted** rather than set to `""`. The webapp strips empty values before every `updateWebapp()` call.
 
 ### 8.3 Discovering installed apps
 
@@ -659,7 +673,7 @@ The following questions were raised during initial requirements drafting and hav
 | 7   | Install manifest / config        | **WebApp Service `properties`** — feed config stored on the App Store webapp itself (`appstore.feeds`); installed app metadata stored as `appstore.*` properties on each installed webapp. No Tag Service dependency. (see §8)                       |
 | 8   | Dependency resolution            | **Not required** initially. Keep it simple. `Depends` field is informational only                                                                                                                                                                    |
 | 9   | Multi-workspace                  | **Supported.** Install flow allows choosing one or more workspaces; can add/remove workspaces later                                                                                                                                                  |
-| 10  | Feed ID discovery                | **By name.** List feeds, find `"SystemLink App Store"`. Cache feed ID in the manifest file                                                                                                                                                           |
+| 10  | Feed ID discovery                | **From config cache.** Feed ID stored in `~/.config/slcli/appstore.json` at `feed add` time. No name-based Feed Service scan. Webapp reads from its own `appstore.feeds` property.                                                                   |
 | 11  | Screenshots / icons              | **Base64-encoded** in package `attributes`. Max **3 screenshots** per app. `Packages.gz` for bandwidth. Survives replication, no external requests needed                                                                                            |
 | 12  | Install permissions              | **Existing Web Application permissions** apply. Webapp checks permissions on launch and shows guidance                                                                                                                                               |
 | 13  | Ratings / reviews                | **No.** Not in scope                                                                                                                                                                                                                                 |
@@ -671,10 +685,10 @@ The following questions were raised during initial requirements drafting and hav
 | 19  | CLI GitHub access                | **Yes.** `slcli appstore` supports `--source github` to browse/install directly from GitHub for dev/testing                                                                                                                                          |
 | 20  | CI/CD integration                | **Yes.** `slcli appstore publish --prepare-pr` generates a ready-to-commit branch                                                                                                                                                                    |
 | 21  | Packages file size with base64   | **Acceptable.** Several megabytes is fine. Cap screenshots at 3 per app. Use `Packages.gz` for feed replication                                                                                                                                      |
-| 22  | Feed replication frequency       | **Manual.** Feed refresh is not automatic. Users trigger via "Refresh Feed" button in webapp or `slcli appstore feed sync` CLI command                                                                                                               |
+| 22  | Feed replication frequency       | **Manual.** Feed refresh is not automatic. Users trigger via "Refresh Feed" button in webapp or `slcli appstore feed refresh` CLI command                                                                                                            |
 | 23  | `.nipkg` extraction in browser   | **Not needed.** The WebApp Service accepts `.nipkg` files directly via `updateContent()`. No browser-side or server-side extraction required                                                                                                         |
 | 24  | WebApp Service API for install   | **Use `#web-application` client.** `createWebapp()` + `updateContent(id, nipkgBlob)` for install; `updateContent()` for upgrade; `deleteWebapp()` for uninstall                                                                                      |
-| 25  | Manifest per workspace           | **Yes.** One manifest tag per workspace in the Tag Service. Cross-workspace "Installed" view queries each accessible workspace                                                                                                                       |
+| 25  | Install tracking                 | **WebApp properties.** `appstore.*` properties on each installed webapp. Cross-workspace "Installed" view lists all webapps with `appstore.packageName` present. No Tag Service dependency.                                                          |
 | 26  | Catalog performance / pagination | **Feed Service does not appear to support pagination.** Validate performance later with real data. Client-side filtering is the initial approach                                                                                                     |
 | 27  | Onboarding (first-time setup)    | **Yes.** Webapp shows an onboarding wizard that replicates the feed from GitHub on the user's behalf (see §4.6)                                                                                                                                      |
 | 28  | Bootstrap (self-hosting)         | **Manual bootstrap.** User downloads `AppStore.nipkg` from GitHub Releases, uploads via SystemLink WebApp UI, then launches the App Store to complete onboarding. A GitHub Pages landing page will eventually provide a polished download experience |

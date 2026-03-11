@@ -50,19 +50,21 @@
       Enter the URL of an App Store–compatible feed
       (GitHub Pages URL or internal feed server).
     </p>
-    <label class="field-label">Feed URL</label>
-    <nimble-text-field
-      [(ngModel)]="addFeedUrl"
-      placeholder="https://…">
-    </nimble-text-field>
-    <label class="field-label">Display Name (optional)</label>
-    <nimble-text-field
-      [(ngModel)]="addFeedName"
-      placeholder="My Internal Feed">
-    </nimble-text-field>
-    <nimble-button appearance="outline" (click)="addFeed()" [disabled]="addingFeed || !addFeedUrl.trim()">
-      {{ addingFeed ? 'Adding…' : 'Replicate & Add Feed' }}
-    </nimble-button>
+    <div class="form-stack">
+      <label class="field-label">Feed URL</label>
+      <nimble-text-field
+        [(ngModel)]="addFeedUrl"
+        placeholder="https://…">
+      </nimble-text-field>
+      <label class="field-label">Display Name</label>
+      <nimble-text-field
+        [(ngModel)]="addFeedName"
+        placeholder="My Internal Feed">
+      </nimble-text-field>
+      <nimble-button appearance="outline" (click)="addFeed()" [disabled]="addingFeed || !addFeedUrl.trim() || !addFeedName.trim()">
+        {{ addingFeed ? 'Adding…' : 'Replicate & Add Feed' }}
+      </nimble-button>
+    </div>
   </section>
 
   <section class="settings-section">

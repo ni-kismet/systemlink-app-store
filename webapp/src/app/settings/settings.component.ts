@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
-import { FeedConfig, DEFAULT_FEED_URL, FEED_NAME } from '../models/app-store.models';
+import { FeedConfig, DEFAULT_FEED_URL } from '../models/app-store.models';
 import { AppStoreService } from '../services/app-store.service';
 
 @Component({
@@ -66,14 +66,15 @@ export class SettingsComponent implements OnInit {
   }
 
   async addFeed(): Promise<void> {
-    if (this.addingFeed || !this.addFeedUrl.trim()) return;
+    if (this.addingFeed || !this.addFeedUrl.trim() || !this.addFeedName.trim()) return;
     this.addingFeed = true;
     this.error = '';
     try {
-      const result = await this.appStoreService.replicateFeed(this.addFeedUrl.trim());
+      const name = this.addFeedName.trim();
+      const result = await this.appStoreService.replicateFeed(this.addFeedUrl.trim(), name);
       const feedId = result.id ?? result.feedId ?? '';
       const feedConfig: FeedConfig = {
-        name: this.addFeedName.trim() || FEED_NAME,
+        name,
         url: this.addFeedUrl.trim(),
         feedId,
       };

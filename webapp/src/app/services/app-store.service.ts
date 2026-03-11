@@ -24,6 +24,7 @@ import {
   postNifeedV1ReplicateFeed,
   postNifeedV1FeedsByFeedIdCheckForUpdates,
   postNifeedV1FeedsByFeedIdApplyUpdates,
+  deleteNifeedV1FeedsByFeedId,
 } from 'nisystemlink-clients-ts/feeds';
 import type { Package } from 'nisystemlink-clients-ts/feeds';
 import { createClient as createUserClient, createConfig as createUserConfig } from 'nisystemlink-clients-ts/user/client';
@@ -70,6 +71,17 @@ export class AppStoreService {
     return feed?.id ? { id: feed.id, name: feed.name! } : null;
   }
 
+  /** Find an existing feed whose packageSources contain the given URL. */
+  async findFeedBySourceUrl(sourceUrl: string): Promise<{ id: string; name: string } | null> {
+    const { data, error } = await getNifeedV1Feeds({ client: this.feedsClient });
+    if (error) return null;
+    const feeds = data?.feeds ?? [];
+    const feed = feeds.find(f =>
+      (f as any).packageSources?.some((src: string) => src === sourceUrl)
+    );
+    return feed?.id ? { id: feed.id, name: feed.name ?? '' } : null;
+  }
+
   /** List all packages in a feed via the Feed Service packages API.
    * Reads first-class fields from metadata.* and custom App Store fields from
    * metadata.attributes, per the feed format spec. */
@@ -96,18 +108,26 @@ export class AppStoreService {
   }
 
   /** Replicate a feed from a remote URL. */
-  async replicateFeed(feedUrl: string): Promise<any> {
+  async replicateFeed(feedUrl: string, name: string = FEED_NAME): Promise<any> {
     const { data, error } = await postNifeedV1ReplicateFeed({
       client: this.feedsClient,
       body: {
-        name: FEED_NAME,
-        description: 'Curated marketplace for SystemLink apps',
+        name,
         platform: 'WINDOWS',
         urls: [feedUrl],
       },
     });
     if (error) throw new Error(`Failed to replicate feed: ${JSON.stringify(error)}`);
     return data;
+  }
+
+  /** Delete a replicated feed by ID. */
+  async deleteReplicatedFeed(feedId: string): Promise<void> {
+    const { error } = await deleteNifeedV1FeedsByFeedId({
+      client: this.feedsClient,
+      path: { feedId },
+    });
+    if (error) throw new Error(`Failed to delete feed: ${JSON.stringify(error)}`);
   }
 
   /** Trigger a check-for-updates job and poll until it completes.
@@ -203,13 +223,25 @@ export class AppStoreService {
     return this.workspacePromise;
   }
 
-  /** Create a new webapp. Returns the created webapp (with id). */
+  /** Create a new webapp. Returns the created webapp (with id).
+   * Properties are set via a separate update call because the WebApp
+   * Service rejects custom property keys on the create endpoint. */
   async createWebapp(name: string, workspace: string, properties?: Record<string, string>): Promise<any> {
     const { data, error } = await sdkCreateWebapp({
       client: this.webAppClient,
-      body: { name, workspace, policyIds: [], ...(properties ? { properties } : {}) },
+      body: { name, workspace, policyIds: [] },
     });
     if (error) throw new Error(`Failed to create webapp: ${JSON.stringify(error)}`);
+
+    if (properties && data?.id) {
+      const { error: updateError } = await sdkUpdateWebapp({
+        client: this.webAppClient,
+        path: { id: data.id },
+        body: { name, policyIds: [], properties },
+      });
+      if (updateError) throw new Error(`Failed to set webapp properties: ${JSON.stringify(updateError)}`);
+    }
+
     return data;
   }
 
@@ -310,21 +342,25 @@ export class AppStoreService {
     const ownId = this.getOwnWebappId();
     if (!ownId) throw new Error('Cannot save feed config: App Store webapp ID not found');
 
-    // Read current properties so we only change the feeds key.
+    // Read current webapp so we can preserve name, policyIds, and non-appstore properties.
     const { data: current } = await sdkGetWebapp({
       client: this.webAppClient,
       path: { id: ownId },
     });
     const existing = ((current as any)?.properties ?? {}) as Record<string, string>;
+    const name = (current as any)?.name ?? '';
+    const policyIds = (current as any)?.policyIds ?? [];
 
     const { error } = await sdkUpdateWebapp({
       client: this.webAppClient,
       path: { id: ownId },
       body: {
-        properties: {
+        name,
+        policyIds,
+        properties: this.stripEmptyValues({
           ...existing,
           [APPSTORE_PROP_FEEDS]: JSON.stringify(feeds),
-        },
+        }),
       },
     });
     if (error) throw new Error(`Failed to save feed configs: ${JSON.stringify(error)}`);
@@ -458,15 +494,14 @@ export class AppStoreService {
 
   /** Build the `appstore.*` property map to attach to a newly installed webapp. */
   private buildAppStoreProperties(pkg: AppPackage, feedConfig: FeedConfig | null): Record<string, string> {
-    return {
+    return this.stripEmptyValues({
       [APPSTORE_PROP_PACKAGE]: pkg.packageName,
       [APPSTORE_PROP_VERSION]: pkg.version,
       [APPSTORE_PROP_TYPE]: pkg.type,
       [APPSTORE_PROP_FEED_ID]: feedConfig?.feedId ?? '',
       [APPSTORE_PROP_FEED_URL]: feedConfig?.url ?? '',
       [APPSTORE_PROP_INSTALLED_AT]: new Date().toISOString(),
-      [APPSTORE_PROP_UPDATED_AT]: '',
-    };
+    });
   }
 
   /** Merge updated version/timestamp into an installed webapp's properties. */
@@ -476,16 +511,20 @@ export class AppStoreService {
       path: { id: webappId },
     });
     const existing = ((current as any)?.properties ?? {}) as Record<string, string>;
+    const name = (current as any)?.name ?? '';
+    const policyIds = (current as any)?.policyIds ?? [];
 
     const { error } = await sdkUpdateWebapp({
       client: this.webAppClient,
       path: { id: webappId },
       body: {
-        properties: {
+        name,
+        policyIds,
+        properties: this.stripEmptyValues({
           ...existing,
           [APPSTORE_PROP_VERSION]: newVersion,
           [APPSTORE_PROP_UPDATED_AT]: new Date().toISOString(),
-        },
+        }),
       },
     });
     if (error) throw new Error(`Failed to update webapp properties after upgrade: ${JSON.stringify(error)}`);
@@ -567,6 +606,11 @@ export class AppStoreService {
     return [...latestPackages.values()].sort(
       (left, right) => left.displayName.localeCompare(right.displayName) || left.packageName.localeCompare(right.packageName)
     );
+  }
+
+  /** Remove entries with empty-string values — the WebApp Service rejects them. */
+  private stripEmptyValues(props: Record<string, string>): Record<string, string> {
+    return Object.fromEntries(Object.entries(props).filter(([, v]) => v !== ''));
   }
 
   private extractFileName(filenameOrUrl: string): string {
