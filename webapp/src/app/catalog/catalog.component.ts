@@ -59,17 +59,18 @@ export class CatalogComponent implements OnInit {
       }
 
       // 3. If no feed configured, fall back to feed discovery then go to onboarding
-      if (!this.feedId) {
+      if (feedConfigs.length === 0) {
         const feed = await this.appStoreService.discoverFeed();
         if (!feed) {
           this.router.navigate(['/onboarding']);
           return;
         }
         this.feedId = feed.id;
+        this.packages = await this.appStoreService.listPackages(this.feedId);
+      } else {
+        // 4. Load packages from ALL configured feeds in parallel
+        this.packages = await this.appStoreService.listPackagesFromFeeds(feedConfigs);
       }
-
-      // 4. Load packages
-      this.packages = await this.appStoreService.listPackages(this.feedId);
       this.categories = [...new Set(this.packages.map(p => p.category).filter(Boolean))].sort();
       this.applyFilters();
     } catch (e: any) {
@@ -111,12 +112,14 @@ export class CatalogComponent implements OnInit {
 
   async install(pkg: AppPackage, event: Event): Promise<void> {
     event.stopPropagation();
-    if (!this.feedId || this.installingPackage) return;
+    if (this.installingPackage) return;
 
     this.installingPackage = pkg.packageName;
-    const feedConfig = this.feedConfigs.find(f => f.feedId === this.feedId) ?? null;
+    const feedId = pkg.sourceFeedId ?? this.feedId;
+    if (!feedId) { this.installingPackage = null; return; }
+    const feedConfig = this.feedConfigs.find(f => f.feedId === feedId) ?? null;
     try {
-      await this.appStoreService.installApp(this.feedId, pkg, feedConfig);
+      await this.appStoreService.installApp(feedId, pkg, feedConfig);
       // Reload installed status after install
       const currentWorkspace = await this.appStoreService.getWorkspace();
       const allInstallations = await this.appStoreService.listInstalledWebapps();

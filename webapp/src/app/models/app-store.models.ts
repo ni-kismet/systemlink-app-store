@@ -40,6 +40,8 @@ export interface AppPackage {
   filename: string;
   /** Feed-level package ID (for API calls). */
   feedPackageId?: string;
+  /** Feed Service feed ID this package was loaded from. */
+  sourceFeedId?: string;
 }
 
 /**

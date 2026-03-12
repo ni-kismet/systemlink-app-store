@@ -94,9 +94,33 @@ export class AppStoreService {
 
     const packages = (data?.packages ?? [])
       .filter(p => this.isUserVisibleWebappResource(p))
-      .map(p => this.mapPackageResource(p));
+      .map(p => ({ ...this.mapPackageResource(p), sourceFeedId: feedId }));
 
     return this.selectLatestPackages(packages);
+  }
+
+  /**
+   * Query all configured feeds in parallel and merge the results.
+   * For packages that appear in multiple feeds, the highest semver wins.
+   * Each returned AppPackage retains the sourceFeedId of the feed it came from,
+   * so downstream install/download calls use the correct feed.
+   */
+  async listPackagesFromFeeds(feeds: FeedConfig[]): Promise<AppPackage[]> {
+    if (feeds.length === 0) return [];
+
+    const results = await Promise.allSettled(
+      feeds.map(feed => this.listPackages(feed.feedId))
+    );
+
+    const all: AppPackage[] = [];
+    for (const result of results) {
+      if (result.status === 'fulfilled') {
+        all.push(...result.value);
+      }
+      // Silently ignore failed feeds so one bad feed doesn't break the catalog
+    }
+
+    return this.selectLatestPackages(all);
   }
 
   /** Download a package file (returns a Blob). */

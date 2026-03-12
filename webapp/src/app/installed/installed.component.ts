@@ -67,12 +67,14 @@ export class InstalledComponent implements OnInit {
   }
 
   async upgrade(entry: InstalledEntry): Promise<void> {
-    if (!this.feedId || !entry.catalogPkg || this.actionLoading) return;
+    if (!entry.catalogPkg || this.actionLoading) return;
+    const feedId = entry.catalogPkg.sourceFeedId ?? this.feedId;
+    if (!feedId) return;
     this.actionLoading = entry.packageName;
     this.error = '';
     try {
       await this.appStoreService.upgradeAppAcrossWorkspaces(
-        this.feedId,
+        feedId,
         entry.catalogPkg,
         entry.installations,
       );
@@ -85,7 +87,7 @@ export class InstalledComponent implements OnInit {
   }
 
   async upgradeAll(): Promise<void> {
-    if (!this.feedId || this.upgradingAll) return;
+    if (this.upgradingAll) return;
     this.upgradingAll = true;
     this.error = '';
 
@@ -93,8 +95,10 @@ export class InstalledComponent implements OnInit {
 
     try {
       for (const entry of upgradableEntries) {
+        const feedId = entry.catalogPkg!.sourceFeedId ?? this.feedId;
+        if (!feedId) continue;
         await this.appStoreService.upgradeAppAcrossWorkspaces(
-          this.feedId,
+          feedId,
           entry.catalogPkg!,
           entry.installations,
         );
@@ -149,7 +153,12 @@ export class InstalledComponent implements OnInit {
       }
 
       let catalogMap = new Map<string, AppPackage>();
-      if (this.feedId) {
+      if (feedConfigs.length > 0) {
+        const packages = await this.appStoreService.listPackagesFromFeeds(feedConfigs);
+        for (const pkg of packages) {
+          catalogMap.set(pkg.packageName, pkg);
+        }
+      } else if (this.feedId) {
         const packages = await this.appStoreService.listPackages(this.feedId);
         for (const pkg of packages) {
           catalogMap.set(pkg.packageName, pkg);

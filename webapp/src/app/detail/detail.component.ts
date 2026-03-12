@@ -78,18 +78,20 @@ export class AppDetailComponent implements OnInit {
       this.feedConfig = feedConfigs[0] ?? null;
 
       // Discover feed if not configured
-      if (!this.feedId) {
+      if (feedConfigs.length === 0) {
         const feed = await this.appStoreService.discoverFeed();
-        if (feed) this.feedId = feed.id;
+        if (feed) { this.feedId = feed.id; this.feedConfig = null; }
       }
 
-      if (!this.feedId) {
+      if (feedConfigs.length === 0 && !this.feedId) {
         this.error = 'Feed not found. Please complete onboarding first.';
         return;
       }
 
-      // Load all packages and find by packageName
-      const packages = await this.appStoreService.listPackages(this.feedId);
+      // Load packages from ALL configured feeds and find by packageName
+      const packages = feedConfigs.length > 0
+        ? await this.appStoreService.listPackagesFromFeeds(feedConfigs)
+        : await this.appStoreService.listPackages(this.feedId!);
       this.pkg = packages.find(p => p.packageName === packageName) ?? null;
 
       if (!this.pkg) {
@@ -208,7 +210,12 @@ export class AppDetailComponent implements OnInit {
   }
 
   async applyWorkspaceChanges(): Promise<void> {
-    if (!this.feedId || !this.pkg || this.actionLoading) return;
+    if (!this.pkg || this.actionLoading) return;
+    const feedId = this.pkg.sourceFeedId ?? this.feedId;
+    if (!feedId) return;
+    const feedConfig = this.feedConfig?.feedId === feedId
+      ? this.feedConfig
+      : null;
     const toInstallIds = this.pendingWorkspaceIds.filter(id => !this.originalInstalledIds.has(id));
     const toUninstall = this.workspaceInstallations.filter(inst => !this.pendingWorkspaceIds.includes(inst.workspaceId));
     this.actionLoading = true;
@@ -216,10 +223,10 @@ export class AppDetailComponent implements OnInit {
     try {
       if (toInstallIds.length > 0) {
         await this.appStoreService.installAppAcrossWorkspaces(
-          this.feedId,
+          feedId,
           this.pkg,
           toInstallIds,
-          this.feedConfig,
+          feedConfig,
         );
       }
       if (toUninstall.length > 0) {
@@ -236,11 +243,13 @@ export class AppDetailComponent implements OnInit {
   }
 
   async upgrade(): Promise<void> {
-    if (!this.feedId || !this.pkg || !this.installed || this.actionLoading) return;
+    if (!this.pkg || !this.installed || this.actionLoading) return;
+    const feedId = this.pkg.sourceFeedId ?? this.feedId;
+    if (!feedId) return;
     this.actionLoading = true;
     this.error = '';
     try {
-      await this.appStoreService.upgradeApp(this.feedId, this.pkg, this.installed);
+      await this.appStoreService.upgradeApp(feedId, this.pkg, this.installed);
       await this.reloadWorkspaceState();
     } catch (e: any) {
       this.error = `Upgrade failed: ${e.message}`;
