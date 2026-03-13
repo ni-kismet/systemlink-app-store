@@ -498,7 +498,73 @@ export class AppComponent implements OnInit, OnDestroy {
 }
 ```
 
-If the app is hosted by SystemLink inside a same-origin iframe, this parent-provider sync keeps the embedded app aligned with the shell when the user switches between light and dark mode.
+### How theme sync works
+
+SystemLink's Web Apps shell renders each webapp inside a **same-origin `<iframe>`**. Because host and child share the same origin, the iframe's JavaScript can read and observe the parent document's DOM.
+
+#### Initial detection — priority cascade
+
+`detectInitialTheme()` resolves the starting theme by checking sources in order:
+
+| Priority | Source | Why |
+|----------|--------|-----|
+| 1 | `?theme=dark` URL query parameter | Easy override for dev/testing without needing the full shell |
+| 2 | Parent frame's `nimble-theme-provider[theme]` attribute | SystemLink's shell owns a `<nimble-theme-provider>` element; reading its `theme` attribute gives the exact theme the shell is currently displaying |
+| 3 | `localStorage.getItem('sl_app_theme')` | Remembers a previously chosen preference when running standalone (outside the shell) |
+| 4 | `window.matchMedia('(prefers-color-scheme: dark)')` | OS-level dark mode when no other signal is available |
+| 5 | `'light'` | Safe default |
+
+Each priority block is wrapped in its own `try/catch` so a failure in one (e.g. cross-origin access, missing API) does not prevent the lower priorities from being evaluated.
+
+#### Dynamic updates — MutationObserver on the parent provider
+
+`watchParentTheme()` installs a `MutationObserver` on the parent document's `nimble-theme-provider` element:
+
+```typescript
+this.themeObserver = new MutationObserver(() => {
+  const t = parentProvider.getAttribute('theme');
+  if (t === 'light' || t === 'dark') this.currentTheme = t;
+});
+this.themeObserver.observe(parentProvider, {
+  attributes: true,
+  attributeFilter: ['theme'],   // only fires when the `theme` attribute mutates
+});
+```
+
+When the SystemLink user toggles the theme in the shell, the shell updates its `nimble-theme-provider theme="dark|light"` attribute. The `MutationObserver` callback fires immediately (synchronously in the microtask queue), Angular's change detection picks up the new `currentTheme` value, and `<nimble-theme-provider [theme]="currentTheme">` re-renders with the correct token set. The transition happens with no perceptible lag.
+
+#### Template binding
+
+The root component template must bind `currentTheme` directly to the `<nimble-theme-provider>` element that wraps all app content:
+
+```html
+<nimble-theme-provider [theme]="currentTheme">
+  <nimble-label-provider-core withDefaults></nimble-label-provider-core>
+  <!-- all app content here -->
+  <router-outlet></router-outlet>
+</nimble-theme-provider>
+```
+
+Nimble's theme provider resolves its design tokens (colors, shadows, etc.) based on its own `theme` property. Every `--ni-nimble-*` CSS variable inside the provider's subtree updates when the property changes.
+
+#### Cleanup in `ngOnDestroy`
+
+The observer holds a reference to the parent DOM element. Always disconnect it when the component is destroyed to prevent memory leaks:
+
+```typescript
+ngOnDestroy(): void {
+  this.themeObserver?.disconnect();
+}
+```
+
+#### Cross-origin and standalone safety
+
+All `window.parent.document` access is wrapped in `try/catch`. If the app is:
+- opened directly in a browser tab (`window.parent === window`) → the guard `if (window.parent === window) return;` exits early
+- embedded in a cross-origin frame → accessing `window.parent.document` throws a `SecurityError`; the `catch {}` silently swallows it and the app falls through to localStorage / system preference
+- embedded same-origin (production SystemLink) → fully works
+
+This pattern requires zero configuration — the same binary works correctly in all three contexts.
 
 ### nimble-anchor-tabs navigation
 
