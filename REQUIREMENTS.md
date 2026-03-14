@@ -47,7 +47,7 @@ Publishing is **curated**: all submissions go through a PR-based review process 
 │  │ WebApp Service — install/uninstall/discover installed apps   │   │
 │  │ ├── App Store webapp properties: registered feed list        │   │
 │  │ └── Installed webapp properties: App Store install metadata  │   │
-│  │ Feed Service — catalog packages (nisystemlink-clients-ts)    │   │
+│  │ Feed Service — catalog packages (@ni/systemlink-clients-ts)    │   │
 │  └──────────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -195,9 +195,9 @@ For the CLI, `slcli appstore feed add` writes the feed ID returned by the Feed S
 
 - **Framework:** Angular 19, NgModule-based (per systemlink-webapp skill)
 - **Design system:** `@ni/nimble-angular` — cards, table, buttons, drawers, banners, breadcrumbs, spinner
-- **API calls:** Use `nisystemlink-clients-ts` for all SystemLink API calls:
-  - **Feed Service** — `nisystemlink-clients-ts/feeds` (catalog browsing, feed replication, check/apply updates)
-  - **WebApp Service** — `nisystemlink-clients-ts/web-application` (`createWebapp`, `updateContent`, `deleteWebapp`, `listWebapps`, `getWebapp`, `updateWebapp`) — also used to persist feed config and discover installed apps via **webapp properties**
+- **API calls:** Use `@ni/systemlink-clients-ts` for all SystemLink API calls:
+  - **Feed Service** — `@ni/systemlink-clients-ts/feeds` (catalog browsing, feed replication, check/apply updates)
+  - **WebApp Service** — `@ni/systemlink-clients-ts/web-application` (`createWebapp`, `updateContent`, `deleteWebapp`, `listWebapps`, `getWebapp`, `updateWebapp`) — also used to persist feed config and discover installed apps via **webapp properties**
 - **Auth:** Same-origin cookie auth (`credentials: 'include'`), no API key needed
 - **Routing:** Hash-based (`useHash: true`) for SystemLink sub-path hosting
 - **CSP compliance:** No `<base href>`, `APP_BASE_HREF` via DI, `inlineCritical: false`
@@ -751,7 +751,7 @@ Remaining questions that need further investigation:
 
 ### Phase 2 — Webapp
 
-- Build the App Store Angular webapp using `nisystemlink-clients-ts` (`#feeds`, `#web-application`, `#file-ingestion`)
+- Build the App Store Angular webapp using `@ni/systemlink-clients-ts` (`#feeds`, `#web-application`, `#file-ingestion`)
   - Catalog browse view with card grid (base64 icons rendered inline)
   - App detail view with base64 screenshots (max 3 per app)
   - Installed apps view with upgrade detection (semver comparison, cross-workspace query)

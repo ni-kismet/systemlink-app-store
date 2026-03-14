@@ -21,7 +21,7 @@
     "@angular/router": "19.2.17",
     "@ni/nimble-angular": "^32.3.12",
     "@ni/nimble-components": "^35.4.0",
-    "nisystemlink-clients-ts": "file:./nisystemlink-clients-ts-1.0.0.tgz",
+    "@ni/systemlink-clients-ts": "^0.2.0",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0"
   },
@@ -29,7 +29,7 @@
     "@angular/build": "19.2.17",
     "@angular/cli": "19.2.17",
     "@angular/compiler-cli": "19.2.17",
-    "@ni-kismet/sl-webapp-nipkg": "file:ni-kismet-sl-webapp-nipkg-0.3.0.tgz",
+    "@ni-kismet/sl-webapp-nipkg": "^1.0.0",
     "prettier": "^3.8.1",
     "typescript": "~5.8.2"
   }

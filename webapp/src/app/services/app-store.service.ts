@@ -18,7 +18,7 @@ import {
 } from '../models/app-store.models';
 
 // ── SDK imports ───────────────────────────────────────────────
-import { createClient as createFeedsClient, createConfig as createFeedsConfig } from 'nisystemlink-clients-ts/feeds/client';
+import { createClient as createFeedsClient, createConfig as createFeedsConfig } from '@ni/systemlink-clients-ts/feeds/client';
 import {
   getNifeedV1Feeds,
   getNifeedV1FeedsByFeedIdPackages,
@@ -26,22 +26,22 @@ import {
   postNifeedV1FeedsByFeedIdCheckForUpdates,
   postNifeedV1FeedsByFeedIdApplyUpdates,
   deleteNifeedV1FeedsByFeedId,
-} from 'nisystemlink-clients-ts/feeds';
-import type { Package } from 'nisystemlink-clients-ts/feeds';
-import { createClient as createUserClient, createConfig as createUserConfig } from 'nisystemlink-clients-ts/user/client';
-import { getWorkspaces } from 'nisystemlink-clients-ts/user';
-import { createClient as createWebAppClient, createConfig as createWebAppConfig } from 'nisystemlink-clients-ts/web-application/client';
+} from '@ni/systemlink-clients-ts/feeds';
+import type { Package } from '@ni/systemlink-clients-ts/feeds';
+import { createClient as createUserClient, createConfig as createUserConfig } from '@ni/systemlink-clients-ts/user/client';
+import { getWorkspaces } from '@ni/systemlink-clients-ts/user';
+import { createClient as createWebAppClient, createConfig as createWebAppConfig } from '@ni/systemlink-clients-ts/web-application/client';
 import {
   listWebapps as sdkListWebapps,
   createWebapp as sdkCreateWebapp,
   deleteWebapp as sdkDeleteWebapp,
   getWebapp as sdkGetWebapp,
   updateWebapp as sdkUpdateWebapp,
-} from 'nisystemlink-clients-ts/web-application';
+} from '@ni/systemlink-clients-ts/web-application';
 import {
   deleteNotebook as sdkDeleteNotebook,
-} from 'nisystemlink-clients-ts/notebook';
-import { createClient as createNotebookClient, createConfig as createNotebookConfig } from 'nisystemlink-clients-ts/notebook/client';
+} from '@ni/systemlink-clients-ts/notebook';
+import { createClient as createNotebookClient, createConfig as createNotebookConfig } from '@ni/systemlink-clients-ts/notebook/client';
 import { compareSemver } from '../utils/semver';
 import { extractFirstMatch } from '../utils/nipkg-extract';
 

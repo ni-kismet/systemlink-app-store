@@ -5,7 +5,7 @@ description: >
   whenever a user wants to create a frontend app that runs inside SystemLink (as a webapp), uses the
   Nimble Angular design system (@ni/nimble-angular), calls any SystemLink REST API (tags, test
   results, assets, systems, work items, etc.), or deploys a built web app to SystemLink with slcli.
-  Also use it when the user asks about using the nisystemlink-clients-ts TypeScript SDK, generating a
+  Also use it when the user asks about using the @ni/systemlink-clients-ts TypeScript SDK, generating a
   TypeScript API client from a SystemLink OpenAPI spec, troubleshooting CORS or CSP errors on a
   SystemLink-hosted app, or configuring Angular routing for SystemLink's sub-path hosting.
 compatibility:
@@ -48,40 +48,30 @@ npm install @ni/nimble-angular @ni/nimble-components
 
 ## Step 3: Add the SystemLink TypeScript SDK
 
-**Always use [nisystemlink-clients-ts](https://github.com/ni-kismet/nisystemlink-clients-ts) as the first choice** for any SystemLink API call. It ships pre-built, typed SDKs for every major SystemLink service (tags, test monitor, file ingestion, asset management, work items, etc.) so you don't need to generate anything.
+**Always use [@ni/systemlink-clients-ts](https://github.com/ni-kismet/nisystemlink-clients-ts) as the first choice** for any SystemLink API call. It ships pre-built, typed SDKs for every major SystemLink service (tags, test monitor, file ingestion, asset management, work items, etc.) so you don't need to generate anything.
 
 ### Install
 
-If the package is available locally (the repo has already been cloned):
-
 ```bash
-npm install --legacy-peer-deps /path/to/nisystemlink-clients-ts
+npm install @ni/systemlink-clients-ts
 ```
-
-Or if published to a registry:
-
-```bash
-npm install nisystemlink-clients-ts
-```
-
-> **Note:** The package has `"type": "module"` and ships ESM + CJS builds with `.d.ts` declarations. If installing from a local clone, run `npm run build` inside the package repo first to generate the `dist/` folder.
 
 ### Available services (import paths)
 
 | Service | Import path | `baseUrl` (append to `window.location.origin`) |
 |---------|-------------|------------------------------------------------|
-| Feeds | `nisystemlink-clients-ts/feeds` | (none — spec paths already include `/nifeed/v1/`) |
-| Tags | `nisystemlink-clients-ts/tags` | `+ '/nitag'` |
-| User / Workspaces | `nisystemlink-clients-ts/user` | `+ '/niuser/v1'` |
-| Web Application | `nisystemlink-clients-ts/web-application` | `+ '/niapp/v1'` |
-| File Ingestion | `nisystemlink-clients-ts/file-ingestion` | `+ '/nifile'` |
-| Test Monitor | `nisystemlink-clients-ts/test-monitor` | `+ '/nitest'` |
-| Asset Management | `nisystemlink-clients-ts/asset-management` | `+ '/niapm'` |
-| Work Items | `nisystemlink-clients-ts/work-item` | `+ '/niworkorder'` |
-| Systems Management | `nisystemlink-clients-ts/systems-management` | `+ '/nisysmgmt'` |
-| Notebooks | `nisystemlink-clients-ts/notebook` | `+ '/ninotebook'` |
+| Feeds | `@ni/systemlink-clients-ts/feeds` | (none — spec paths already include `/nifeed/v1/`) |
+| Tags | `@ni/systemlink-clients-ts/tags` | `+ '/nitag'` |
+| User / Workspaces | `@ni/systemlink-clients-ts/user` | `+ '/niuser/v1'` |
+| Web Application | `@ni/systemlink-clients-ts/web-application` | `+ '/niapp/v1'` |
+| File Ingestion | `@ni/systemlink-clients-ts/file-ingestion` | `+ '/nifile'` |
+| Test Monitor | `@ni/systemlink-clients-ts/test-monitor` | `+ '/nitest'` |
+| Asset Management | `@ni/systemlink-clients-ts/asset-management` | `+ '/niapm'` |
+| Work Items | `@ni/systemlink-clients-ts/work-item` | `+ '/niworkorder'` |
+| Systems Management | `@ni/systemlink-clients-ts/systems-management` | `+ '/nisysmgmt'` |
+| Notebooks | `@ni/systemlink-clients-ts/notebook` | `+ '/ninotebook'` |
 
-The client factory for each service lives at `nisystemlink-clients-ts/<service>/client`.
+The client factory for each service lives at `@ni/systemlink-clients-ts/<service>/client`.
 
 > **Base URL gotcha:** Each generated client's path depends on its OpenAPI spec base. For **Feeds**, the spec base is `https://host/` and operation paths already include `/nifeed/v1/...`, so use `baseUrl: window.location.origin` with no suffix. For all other services the spec root matches the service prefix (`https://host/nitag`, `https://host/niuser/v1`, etc.), so set `baseUrl: window.location.origin + '/<prefix>'` as shown above.
 
@@ -89,7 +79,7 @@ The client factory for each service lives at `nisystemlink-clients-ts/<service>/
 
 ### Fallback: generate a custom SDK
 
-Only generate a new SDK if the required service is **not** in `nisystemlink-clients-ts`. Use [hey-api/openapi-ts](https://github.com/hey-api/openapi-ts):
+Only generate a new SDK if the required service is **not** in `@ni/systemlink-clients-ts`. Use [hey-api/openapi-ts](https://github.com/hey-api/openapi-ts):
 
 ```bash
 npm install -D @hey-api/openapi-ts
@@ -171,7 +161,7 @@ import { MyFeatureComponent } from './my-feature/my-feature.component';
   providers: [
     { provide: APP_BASE_HREF, useValue: '/' },   // ← REQUIRED — do not use a <base> tag
   ],
-  // Note: do NOT add provideHttpClient() — nisystemlink-clients-ts uses the native fetch API,
+  // Note: do NOT add provideHttpClient() — @ni/systemlink-clients-ts uses the native fetch API,
   // not Angular's HttpClient. No HTTP DI wiring is needed.
   bootstrap: [AppComponent],
 })
@@ -366,11 +356,11 @@ See [Nimble's theme-aware tokens documentation](https://nimble.ni.dev/storybook/
 
 ### Configure the client at runtime
 
-Every `nisystemlink-clients-ts` service exposes `createClient` and `createConfig` from its `/client` subpath. Always create a configured client at call-site (or lazily inside a helper) using values from `window.location.origin` and optionally `localStorage` — never rely on the package's default `baseUrl`.
+Every `@ni/systemlink-clients-ts` service exposes `createClient` and `createConfig` from its `/client` subpath. Always create a configured client at call-site (or lazily inside a helper) using values from `window.location.origin` and optionally `localStorage` — never rely on the package's default `baseUrl`.
 
 ```typescript
-import { createClient, createConfig } from 'nisystemlink-clients-ts/file-ingestion/client';
-import { queryFilesLinq } from 'nisystemlink-clients-ts/file-ingestion';
+import { createClient, createConfig } from '@ni/systemlink-clients-ts/file-ingestion/client';
+import { queryFilesLinq } from '@ni/systemlink-clients-ts/file-ingestion';
 
 function buildClient() {
   const baseUrl = localStorage.getItem('sl_api_url') ?? `${window.location.origin}/nifile`;
