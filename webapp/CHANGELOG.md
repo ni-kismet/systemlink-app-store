@@ -1,8 +1,17 @@
 # Change Log - systemlink-app-store
 
-<!-- This log was last generated on Tue, 17 Mar 2026 22:24:52 GMT and should not be manually modified. -->
+<!-- This log was last generated on Tue, 17 Mar 2026 23:14:44 GMT and should not be manually modified. -->
 
 <!-- Start content -->
+
+## 0.2.1
+
+Tue, 17 Mar 2026 23:14:44 GMT
+
+### Patches
+
+- `systemlink-app-store`
+  - Fix feed refresh: use feed-updates API to get upstream package URIs instead of parsing the replicated Packages index (appstore@ni.com)
 
 ## 0.2.0
 
