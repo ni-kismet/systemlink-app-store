@@ -4,12 +4,12 @@ DisplayName: SystemLink App Store
 DisplayVersion: 0.1.0
 Filename: https://github.com/ni-kismet/systemlink-app-store/releases/download/systemlink-app-store-v0.1.0/systemlink-app-store_0.1.0_all.nipkg
 Homepage: https://github.com/ni-kismet/systemlink-app-store
-MD5sum: d6b43744a8183b2c42446f2b964e5b5b
+MD5sum: bb2640faaaa04ccdd366152dd0bffe10
 Maintainer: NI App Store <appstore@ni.com>
 Package: systemlink-app-store
 Section: WebApps
-SHA256: b6078b9d97de9d0e7783258e157b5dd4b95e3ec99501a221f3c9da7c58821ed9
-Size: 581990
+SHA256: 00c74f0c445e1d5f8fa72961f381bcc105ccc3f170511f2877721c8038ded9c2
+Size: 589168
 UserVisible: yes
 Version: 0.1.0
 AppStoreAuthor: NI
