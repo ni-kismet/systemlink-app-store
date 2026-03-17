@@ -223,7 +223,11 @@ export class AppStoreService {
     const packageUris = stanzas
       .map(s => s['Filename'])
       .filter((uri): uri is string => !!uri && uri.startsWith('http'));
-    if (packageUris.length === 0) throw new Error('No downloadable packages found in upstream index');
+    if (packageUris.length === 0) {
+      // The replicated index exists but has no external download URLs — the
+      // feed server has already fully replicated all packages locally.
+      return;
+    }
 
     // apply-updates: body is a flat object with applyUpdateDescriptors array.
     const res = await fetch(
