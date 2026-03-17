@@ -7,6 +7,8 @@ import {
   WorkspaceInfo,
   WorkspaceInstallation,
   FEED_NAME,
+  APP_STORE_PACKAGE_NAME,
+  APP_STORE_VERSION,
   APPSTORE_PROP_FEEDS,
   APPSTORE_PROP_PACKAGE,
   APPSTORE_PROP_VERSION,
@@ -423,6 +425,46 @@ export class AppStoreService {
       },
     });
     if (error) throw new Error(`Failed to save feed configs: ${JSON.stringify(error)}`);
+  }
+
+  /**
+   * Tag the App Store's own webapp with the standard `appstore.*` identification
+   * properties so it appears as an installed (and upgradable) app in the catalog.
+   * Should be called during onboarding once the primary feed is configured.
+   */
+  async tagOwnWebapp(feedId: string, feedUrl: string): Promise<void> {
+    const ownId = this.getOwnWebappId();
+    if (!ownId) return;
+
+    const { data: current } = await sdkGetWebapp({
+      client: this.webAppClient,
+      path: { id: ownId },
+    });
+    const existing = ((current as any)?.properties ?? {}) as Record<string, string>;
+    const name = (current as any)?.name ?? '';
+    const policyIds = (current as any)?.policyIds ?? [];
+
+    // Only set installedAt if not already present (preserve original install time).
+    const installedAt = existing[APPSTORE_PROP_INSTALLED_AT] || new Date().toISOString();
+
+    const { error } = await sdkUpdateWebapp({
+      client: this.webAppClient,
+      path: { id: ownId },
+      body: {
+        name,
+        policyIds,
+        properties: this.stripEmptyValues({
+          ...existing,
+          [APPSTORE_PROP_PACKAGE]: APP_STORE_PACKAGE_NAME,
+          [APPSTORE_PROP_VERSION]: APP_STORE_VERSION,
+          [APPSTORE_PROP_TYPE]: 'webapp',
+          [APPSTORE_PROP_FEED_ID]: feedId,
+          [APPSTORE_PROP_FEED_URL]: feedUrl,
+          [APPSTORE_PROP_INSTALLED_AT]: installedAt,
+        }),
+      },
+    });
+    if (error) throw new Error(`Failed to tag App Store webapp: ${JSON.stringify(error)}`);
   }
 
   // ── Installed resource discovery ────────────────────────────────

@@ -101,6 +101,8 @@ export class OnboardingComponent {
     const existing = await this.appStoreService.loadFeedConfigs();
     const updated = [...existing.filter(f => f.feedId !== this.feedId), mainFeedConfig];
     await this.appStoreService.saveFeedConfigs(updated);
+    // Tag the App Store's own webapp so it appears as installed in the catalog.
+    await this.appStoreService.tagOwnWebapp(this.feedId, this.feedUrl.trim());
     this.step = 2;
   }
 

@@ -115,6 +115,12 @@ export const DEFAULT_FEED_URL = 'https://ni-kismet.github.io/systemlink-app-stor
 /** Well-known feed name used for discovery. */
 export const FEED_NAME = 'SystemLink App Store';
 
+/** Package name of the App Store itself in the feed. */
+export const APP_STORE_PACKAGE_NAME = 'systemlink-app-store';
+
+/** Version of this App Store webapp build. */
+export const APP_STORE_VERSION = '0.1.1';
+
 // ── WebApp property keys ──────────────────────────────────────────────────────
 
 /** Property key on the App Store webapp itself: JSON-serialised FeedConfig[]. */
