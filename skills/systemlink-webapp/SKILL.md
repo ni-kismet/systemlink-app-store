@@ -39,7 +39,7 @@ You do NOT need to ask about Angular version or Nimble versions — always use t
 ```bash
 npx -y @angular/cli@latest new <app-name> --routing --style=scss --skip-git --no-standalone
 cd <app-name>
-npm install @ni/nimble-angular @ni/nimble-components
+npm install @ni/nimble-angular
 ```
 
 > Use `--no-standalone` to generate an NgModule-based app. SystemLink webapps work best with NgModule because it makes it easy to register all Nimble modules in one place.
@@ -157,7 +157,6 @@ import { MyFeatureComponent } from './my-feature/my-feature.component';
     NimbleSpinnerModule,
     NimbleBannerModule,
   ],
-  schemas: [CUSTOM_ELEMENTS_SCHEMA],  // required for Nimble web components
   providers: [
     { provide: APP_BASE_HREF, useValue: '/' },   // ← REQUIRED — do not use a <base> tag
   ],
