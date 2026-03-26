@@ -11,6 +11,7 @@ import { AppStoreService } from '../services/app-store.service';
 })
 export class SettingsComponent implements OnInit {
   @ViewChild('addFeedDialog') private addFeedDialogEl?: ElementRef;
+  @ViewChild('removeFeedDialog') private removeFeedDialogEl?: ElementRef;
 
   feeds: FeedConfig[] = [];
   installedCount = 0;
@@ -25,6 +26,9 @@ export class SettingsComponent implements OnInit {
   addFeedUrl = '';
   addFeedName = '';
   addingFeed = false;
+  feedPendingRemoval: FeedConfig | null = null;
+  deleteReplicatedFeedOnRemove = true;
+  removingFeed = false;
 
   constructor(
     private appStoreService: AppStoreService,
@@ -95,7 +99,7 @@ export class SettingsComponent implements OnInit {
   }
 
   openAddFeedDialog(): void {
-    this.addFeedUrl = '';
+    this.addFeedUrl = DEFAULT_FEED_URL;
     this.addFeedName = '';
     this.error = '';
     (this.addFeedDialogEl?.nativeElement as any)?.show();
@@ -105,19 +109,52 @@ export class SettingsComponent implements OnInit {
     (this.addFeedDialogEl?.nativeElement as any)?.close();
   }
 
-  async removeFeed(feed: FeedConfig): Promise<void> {
+  openRemoveFeedDialog(feed: FeedConfig): void {
+    this.feedPendingRemoval = feed;
+    this.deleteReplicatedFeedOnRemove = true;
+    (this.removeFeedDialogEl?.nativeElement as any)?.show();
+  }
+
+  closeRemoveFeedDialog(force = false): void {
+    if (this.removingFeed && !force) return;
+    (this.removeFeedDialogEl?.nativeElement as any)?.close();
+    this.feedPendingRemoval = null;
+    this.deleteReplicatedFeedOnRemove = true;
+  }
+
+  async removeFeed(): Promise<void> {
+    if (!this.feedPendingRemoval || this.removingFeed) return;
+
     this.error = '';
+    this.removingFeed = true;
+    const feedToRemove = this.feedPendingRemoval;
+
     try {
-      const updated = this.feeds.filter(f => f.feedId !== feed.feedId);
+      if (this.deleteReplicatedFeedOnRemove && feedToRemove.feedId) {
+        await this.appStoreService.deleteReplicatedFeed(feedToRemove.feedId);
+      }
+
+      const updated = this.feeds.filter(f => f.feedId !== feedToRemove.feedId);
       await this.appStoreService.saveFeedConfigs(updated);
       this.feeds = updated;
+      this.closeRemoveFeedDialog(true);
     } catch (e: any) {
       this.error = `Failed to remove feed: ${e.message}`;
+    } finally {
+      this.removingFeed = false;
     }
   }
 
   isRefreshing(feed: FeedConfig): boolean {
     return this.refreshingFeedId === feed.feedId;
+  }
+
+  isDefaultFeed(feed: FeedConfig): boolean {
+    return this.normalizeFeedUrl(feed.url) === this.normalizeFeedUrl(DEFAULT_FEED_URL);
+  }
+
+  private normalizeFeedUrl(url: string): string {
+    return url.trim().replace(/\/+$/, '').toLowerCase();
   }
 }
 

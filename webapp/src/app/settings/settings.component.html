@@ -17,7 +17,6 @@
   <section class="settings-section">
     <div class="section-header">
       <h3>Configured Feeds</h3>
-      <nimble-button appearance="outline" (click)="openAddFeedDialog()" [disabled]="!!refreshingFeedId">Add Feed</nimble-button>
     </div>
     <p class="hint">
       The App Store reads packages from the feeds listed below.
@@ -38,13 +37,14 @@
         <nimble-button appearance="outline" (click)="refreshFeed(feed)" [disabled]="!!refreshingFeedId">
           {{ isRefreshing(feed) ? 'Refreshing…' : 'Refresh' }}
         </nimble-button>
-        <nimble-button appearance="outline" (click)="removeFeed(feed)" [disabled]="!!refreshingFeedId">
+        <nimble-button *ngIf="!isDefaultFeed(feed)" appearance="outline" (click)="openRemoveFeedDialog(feed)" [disabled]="!!refreshingFeedId || removingFeed">
           Remove
         </nimble-button>
       </div>
     </div>
 
     <p class="hint">Refresh checks the source feed for updated packages and downloads them.</p>
+    <nimble-button appearance="outline" (click)="openAddFeedDialog()" [disabled]="!!refreshingFeedId">Add Feed</nimble-button>
   </section>
 
   <section class="settings-section">
@@ -61,12 +61,12 @@
 
 <nimble-dialog #addFeedDialog>
   <span slot="title">Add Feed</span>
-  <span slot="subtitle">Enter the URL of an App Store–compatible feed (GitHub Pages URL or internal feed server).</span>
+  <span slot="subtitle">Enter the URL of an App Store-compatible feed.</span>
   <div class="form-stack">
     <label class="field-label">Feed URL</label>
     <nimble-text-field
       [(ngModel)]="addFeedUrl"
-      placeholder="https://…">
+      placeholder="https://your-feed-url">
     </nimble-text-field>
     <label class="field-label">Display Name</label>
     <nimble-text-field
@@ -80,7 +80,18 @@
   </nimble-button>
 </nimble-dialog>
 
-<div *ngIf="!loading && !hasFeedConfig" class="empty-state">
-  <p>No configuration found. Please complete the onboarding wizard.</p>
-  <nimble-button appearance="outline" (click)="router.navigate(['/onboarding'])">Start Onboarding</nimble-button>
-</div>
+<nimble-dialog #removeFeedDialog>
+  <span slot="title">Confirm Feed Removal</span>
+  <span *ngIf="feedPendingRemoval">
+    Remove the configured feed "{{ feedPendingRemoval.name }}"? Apps from this feed will no longer appear in the catalog.
+  </span>
+  <label *ngIf="feedPendingRemoval" class="remove-feed-option">
+    <input type="checkbox" [(ngModel)]="deleteReplicatedFeedOnRemove" [disabled]="removingFeed" />
+    Delete the replicated SystemLink feed resource too
+  </label>
+  <nimble-button appearance="ghost" slot="footer" (click)="closeRemoveFeedDialog()" [disabled]="removingFeed">Cancel</nimble-button>
+  <nimble-button appearance="outline" slot="footer" (click)="removeFeed()" [disabled]="!feedPendingRemoval || removingFeed">
+    {{ removingFeed ? 'Removing…' : 'Remove Feed' }}
+  </nimble-button>
+</nimble-dialog>
+

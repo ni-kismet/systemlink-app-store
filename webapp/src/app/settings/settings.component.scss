@@ -135,6 +135,19 @@ nimble-text-field {
   margin-bottom: var(--sl-app-space-3);
 }
 
+.remove-feed-option {
+  display: flex;
+  align-items: center;
+  gap: var(--sl-app-space-2);
+  margin-top: var(--sl-app-space-3);
+  font: var(--sl-app-font-body);
+  color: var(--sl-app-color-text);
+
+  input {
+    margin: 0;
+  }
+}
+
 // ── Empty / error states ─────────────────────────────────────
 
 .empty-state {

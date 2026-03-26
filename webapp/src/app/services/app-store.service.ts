@@ -697,60 +697,39 @@ export class AppStoreService {
     await this.ensureGrafanaSession();
     const nipkgBlob = await this.downloadPackageFile(feedId, this.extractFileName(pkg.filename));
 
-    // Extract dashboard JSON model from nipkg archive
-    let dashboardModel: any;
-    try {
-      const jsonBlob = await extractFirstMatch(nipkgBlob, p => p.endsWith('.json'));
-      dashboardModel = JSON.parse(await jsonBlob.text());
-    } catch {
-      // Fallback: try reading the blob directly as JSON (non-nipkg package)
-      try {
-        dashboardModel = JSON.parse(await nipkgBlob.text());
-      } catch {
-        dashboardModel = {};
-      }
-    }
-
-    // Find the Grafana folder that corresponds to the target workspace
-    const folderUid = await this.getGrafanaFolderUid(workspace);
-
-    // Encode appstore metadata in dashboard tags for discovery.
-    // Use simple hyphen-separated tags — Grafana lowercases tags and
-    // complex values (URLs, colons) can cause import failures.
-    const tags = [
-      'appstore',
-      `appstore-pkg-${pkg.packageName}`,
-      `appstore-ver-${pkg.version}`,
-      ...(feedConfig?.feedId ? [`appstore-feed-${feedConfig.feedId}`] : []),
-    ];
-
-    // Use the /api/dashboards/import endpoint which normalizes the model,
-    // fills in missing default fields, and handles datasource mappings —
-    // unlike /api/dashboards/db which expects a fully-formed internal model.
-    const body: Record<string, any> = {
-      dashboard: {
-        ...dashboardModel,
+    const dashboardModel = await this.extractDashboardModel(nipkgBlob);
+    await this.importDashboardToWorkspace(
+      {
+        ...this.prepareDashboardForImport(dashboardModel),
         title: pkg.displayName,
-        tags,
-        id: null,
+        tags: this.buildDashboardTags(pkg, feedConfig),
       },
-      overwrite: true,
-      inputs: [],
-    };
-    if (folderUid) {
-      body['folderUid'] = folderUid;
+      workspace,
+    );
+  }
+
+  /** Duplicate an existing dashboard installation into one or more workspaces. */
+  async duplicateDashboardAcrossWorkspaces(
+    sourceDashboardUid: string,
+    workspaces: string[],
+  ): Promise<void> {
+    if (workspaces.length === 0) return;
+
+    await this.ensureGrafanaSession();
+    const source = await this.fetchDashboardByUid(sourceDashboardUid);
+    const baseModel = this.prepareDashboardForImport(source.dashboard ?? {});
+
+    for (const workspace of workspaces) {
+      await this.importDashboardToWorkspace(
+        {
+          ...baseModel,
+          tags: Array.isArray(baseModel.tags) ? [...baseModel.tags] : [],
+        },
+        workspace,
+      );
     }
 
-    const res = await fetch(`${this.origin}/dashboardhost/api/dashboards/import`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) throw new Error(`Failed to import dashboard: ${res.status} ${res.statusText}`);
+    this.invalidateInstallCache();
   }
 
   /** Install a package into one or more workspaces. */
@@ -845,12 +824,7 @@ export class AppStoreService {
   private async upgradeDashboard(dashboardUid: string, pkg: AppPackage, nipkgBlob: Blob): Promise<void> {
     await this.ensureGrafanaSession();
     // Fetch current dashboard to get existing model
-    const getRes = await fetch(
-      `${this.origin}/dashboardhost/api/dashboards/uid/${encodeURIComponent(dashboardUid)}`,
-      { credentials: 'include' },
-    );
-    if (!getRes.ok) throw new Error(`Failed to fetch dashboard for upgrade: ${getRes.status}`);
-    const current = await getRes.json();
+    const current = await this.fetchDashboardByUid(dashboardUid);
 
     let newModel: any;
     try {
@@ -963,6 +937,68 @@ export class AppStoreService {
     } catch {
       return null;
     }
+  }
+
+  private async fetchDashboardByUid(dashboardUid: string): Promise<any> {
+    const res = await fetch(
+      `${this.origin}/dashboardhost/api/dashboards/uid/${encodeURIComponent(dashboardUid)}`,
+      { credentials: 'include' },
+    );
+    if (!res.ok) throw new Error(`Failed to fetch dashboard: ${res.status}`);
+    return res.json();
+  }
+
+  private async extractDashboardModel(nipkgBlob: Blob): Promise<any> {
+    try {
+      const jsonBlob = await extractFirstMatch(nipkgBlob, p => p.endsWith('.json'));
+      return JSON.parse(await jsonBlob.text());
+    } catch {
+      try {
+        return JSON.parse(await nipkgBlob.text());
+      } catch {
+        return {};
+      }
+    }
+  }
+
+  private prepareDashboardForImport(model: any): any {
+    const { id: _id, uid: _uid, version: _version, ...rest } = model ?? {};
+    return {
+      ...rest,
+      id: null,
+    };
+  }
+
+  private buildDashboardTags(pkg: AppPackage, feedConfig: FeedConfig | null): string[] {
+    return [
+      'appstore',
+      `appstore-pkg-${pkg.packageName}`,
+      `appstore-ver-${pkg.version}`,
+      ...(feedConfig?.feedId ? [`appstore-feed-${feedConfig.feedId}`] : []),
+    ];
+  }
+
+  private async importDashboardToWorkspace(dashboard: Record<string, any>, workspace: string): Promise<void> {
+    const folderUid = await this.getGrafanaFolderUid(workspace);
+    const body: Record<string, any> = {
+      dashboard,
+      overwrite: false,
+      inputs: [],
+    };
+    if (folderUid) {
+      body['folderUid'] = folderUid;
+    }
+
+    const res = await fetch(`${this.origin}/dashboardhost/api/dashboards/import`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`Failed to import dashboard: ${res.status} ${res.statusText}`);
   }
 
   private ensureGrafanaSession(): Promise<void> {

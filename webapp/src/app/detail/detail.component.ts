@@ -225,6 +225,7 @@ export class AppDetailComponent implements OnInit {
     if (!this.pkg || this.actionLoading) return;
     const feedId = this.pkg.sourceFeedId ?? this.feedId;
     if (!feedId) return;
+    const pkgType = (this.pkg.type || 'webapp').toLowerCase();
     const feedConfig = this.feedConfig?.feedId === feedId
       ? this.feedConfig
       : null;
@@ -234,12 +235,22 @@ export class AppDetailComponent implements OnInit {
     this.error = '';
     try {
       if (toInstallIds.length > 0) {
-        await this.appStoreService.installAppAcrossWorkspaces(
-          feedId,
-          this.pkg,
-          toInstallIds,
-          feedConfig,
-        );
+        if (pkgType === 'dashboard' && this.isEditMode && this.workspaceInstallations.length > 0) {
+          const sourceInstallation = this.installed?.type === 'dashboard'
+            ? this.installed
+            : this.workspaceInstallations.find(installation => installation.type === 'dashboard');
+          if (!sourceInstallation) {
+            throw new Error('No existing dashboard installation is available to duplicate');
+          }
+          await this.appStoreService.duplicateDashboardAcrossWorkspaces(sourceInstallation.webappId, toInstallIds);
+        } else {
+          await this.appStoreService.installAppAcrossWorkspaces(
+            feedId,
+            this.pkg,
+            toInstallIds,
+            feedConfig,
+          );
+        }
       }
       if (toUninstall.length > 0) {
         await this.appStoreService.uninstallAppAcrossWorkspaces(toUninstall);
