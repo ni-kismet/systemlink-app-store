@@ -2,12 +2,12 @@ Architecture: all
 Description: A curated plugin manager for discovering, installing, upgrading, and removing SystemLink extensions from replicated package feeds.
 Filename: https://github.com/ni-kismet/systemlink-plugin-manager/releases/download/systemlink-plugin-manager-v0.2.1/systemlink-plugin-manager_0.2.1_all.nipkg
 Homepage: https://github.com/ni-kismet/systemlink-plugin-manager
-MD5sum: 9e6f7faf5e2106799dc3a901066d6f6e
+MD5sum: 61e2f21359c85679c2d0c740009768fe
 Maintainer: NI Plugin Manager <appstore@ni.com>
 Package: systemlink-plugin-manager
 Section: Administration
-SHA256: 655e166c69e039f083fce8b8410b0c3874c6233e188bbe4226cedfc9825a0b9a
-Size: 590318
+SHA256: 5cbb1f0a0009d23d607e57f987a0d25e2dec010d9cbfafa79c69dd419190404b
+Size: 592104
 Version: 0.2.1
 XB-DisplayName: Plugin Manager for SystemLink
 XB-DisplayVersion: 0.2.1
