@@ -89,20 +89,20 @@ Your plugin will be available in the Plugin Manager the next time users refresh 
 
 ## Requirements for submitted apps
 
-| Requirement       | Details                                                                                |
-| ----------------- | -------------------------------------------------------------------------------------- |
-| Metadata          | All required `manifest.json` fields must be present (see schema)                       |
-| Plugin metadata   | Must include `section`, `xbPlugin`, `license`, and `maintainer`                         |
-| Content           | `.nipkg` must contain a valid webapp (`index.html` at root) or notebook (`.ipynb`)     |
-| CSP               | No external network calls outside SystemLink's own APIs                                |
-| Icon              | SVG or PNG, max 128×128 px (required)                                                  |
-| Description       | ≥ 20 characters                                                                        |
-| License           | Must be specified (SPDX identifier or "Proprietary")                                   |
-| Checksums         | SHA256 must match `.nipkg` contents                                                    |
-| Version           | Valid semver (`MAJOR.MINOR.PATCH`)                                                     |
-| Architecture      | Must be `windows_all`                                                                  |
-| Size              | ≤ 100 MB                                                                               |
-| Naming            | Package name is first-come-first-served — CI rejects duplicates from different authors |
+| Requirement     | Details                                                                                |
+| --------------- | -------------------------------------------------------------------------------------- |
+| Metadata        | All required `manifest.json` fields must be present (see schema)                       |
+| Plugin metadata | Must include `section`, `xbPlugin`, `license`, and `maintainer`                        |
+| Content         | `.nipkg` must contain a valid webapp (`index.html` at root) or notebook (`.ipynb`)     |
+| CSP             | No external network calls outside SystemLink's own APIs                                |
+| Icon            | SVG or PNG, max 128×128 px (required)                                                  |
+| Description     | ≥ 20 characters                                                                        |
+| License         | Must be specified (SPDX identifier or "Proprietary")                                   |
+| Checksums       | SHA256 must match `.nipkg` contents                                                    |
+| Version         | Valid semver (`MAJOR.MINOR.PATCH`)                                                     |
+| Architecture    | Must be `windows_all`                                                                  |
+| Size            | ≤ 100 MB                                                                               |
+| Naming          | Package name is first-come-first-served — CI rejects duplicates from different authors |
 
 ## Packaging your app
 

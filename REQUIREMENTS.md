@@ -99,26 +99,26 @@ These fields are written to the nipkg control file and mapped by the Feed Servic
 
 These fields use the `XB-` prefix in the control file. The Feed Service strips the prefix and stores them in `metadata.attributes` under their unprefixed names. Consumers read them via `metadata.attributes.<UnprefixedName>`.
 
-| Control File Field  | Attribute Key (Feed Service) | Purpose                                                         |
-| ------------------- | ---------------------------- | --------------------------------------------------------------- |
+| Control File Field  | Attribute Key (Feed Service) | Purpose                                                                                                       |
+| ------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------- |
 | `XB-Plugin`         | `Plugin`                     | **Required.** Top-level plugin type used for routing and filtering (`webapp`, `notebook`, `dashboard`, etc.). |
-| `XB-DisplayName`    | `DisplayName`                | Human-readable app name shown in the store UI                   |
-| `XB-UserVisible`    | `UserVisible`                | `yes` for end-user apps (filter out infrastructure packages)    |
-| `XB-DisplayVersion` | `DisplayVersion`             | Friendly version string (same as `Version`)                     |
+| `XB-DisplayName`    | `DisplayName`                | Human-readable app name shown in the store UI                                                                 |
+| `XB-UserVisible`    | `UserVisible`                | `yes` for end-user apps (filter out infrastructure packages)                                                  |
+| `XB-DisplayVersion` | `DisplayVersion`             | Friendly version string (same as `Version`)                                                                   |
 
 #### Plugin Manager custom attributes
 
 Additional metadata fields for rich catalog browsing. These also use the `XB-` prefix in the control file and appear unprefixed in `metadata.attributes`.
 
-| Control File Field            | Attribute Key (Feed Service) | Purpose                                                                                                                              | Example                                     |
-| ----------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------- |
-| `XB-SlPluginManagerScreenshot1`      | `SlPluginManagerScreenshot1`      | **Base64-encoded** screenshot image (PNG, max 800x600). **Max 3 screenshots** per plugin (`SlPluginManagerScreenshot1`–`SlPluginManagerScreenshot3`). | `data:image/png;base64,iVBOR...`            |
-| `XB-SlPluginManagerScreenshot2`      | `SlPluginManagerScreenshot2`      | Second screenshot (optional)                                                                                                                | `data:image/png;base64,...`                 |
-| `XB-SlPluginManagerScreenshot3`      | `SlPluginManagerScreenshot3`      | Third screenshot (optional)                                                                                                                 | `data:image/png;base64,...`                 |
-| `XB-SlPluginManagerIcon`             | `SlPluginManagerIcon`             | **Base64-encoded** plugin icon (SVG or PNG, max 128x128)                                                                                     | `data:image/svg+xml;base64,PH...`           |
-| `XB-SlPluginManagerMinServerVersion` | `SlPluginManagerMinServerVersion` | Minimum SystemLink server version                                                                                                           | `2024 Q4`                                   |
-| `XB-SlPluginManagerTags`             | `SlPluginManagerTags`             | Comma-separated search tags (mirrors `Tags` for attribute-only consumers)                                                                   | `assets,calibration,dashboard`              |
-| `XB-SlPluginManagerLicense`          | `SlPluginManagerLicense`          | License identifier (required)                                                                                                               | `MIT`, `Apache-2.0`, `Proprietary`          |
+| Control File Field                   | Attribute Key (Feed Service)      | Purpose                                                                                                                                               | Example                            |
+| ------------------------------------ | --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| `XB-SlPluginManagerScreenshot1`      | `SlPluginManagerScreenshot1`      | **Base64-encoded** screenshot image (PNG, max 800x600). **Max 3 screenshots** per plugin (`SlPluginManagerScreenshot1`–`SlPluginManagerScreenshot3`). | `data:image/png;base64,iVBOR...`   |
+| `XB-SlPluginManagerScreenshot2`      | `SlPluginManagerScreenshot2`      | Second screenshot (optional)                                                                                                                          | `data:image/png;base64,...`        |
+| `XB-SlPluginManagerScreenshot3`      | `SlPluginManagerScreenshot3`      | Third screenshot (optional)                                                                                                                           | `data:image/png;base64,...`        |
+| `XB-SlPluginManagerIcon`             | `SlPluginManagerIcon`             | **Base64-encoded** plugin icon (SVG or PNG, max 128x128)                                                                                              | `data:image/svg+xml;base64,PH...`  |
+| `XB-SlPluginManagerMinServerVersion` | `SlPluginManagerMinServerVersion` | Minimum SystemLink server version                                                                                                                     | `2024 Q4`                          |
+| `XB-SlPluginManagerTags`             | `SlPluginManagerTags`             | Comma-separated search tags (mirrors `Tags` for attribute-only consumers)                                                                             | `assets,calibration,dashboard`     |
+| `XB-SlPluginManagerLicense`          | `SlPluginManagerLicense`          | License identifier (required)                                                                                                                         | `MIT`, `Apache-2.0`, `Proprietary` |
 
 > **Why base64?** CSP prevents the webapp from loading images from external origins (GitHub). Base64-encoding icons and screenshots directly in the package `attributes` ensures they survive feed replication and are available to the webapp via the Feed Service API without any external requests. This does increase the `Packages` file size (several megabytes is acceptable), but keeps the architecture simple and CSP-compliant.
 >
@@ -223,8 +223,10 @@ If permissions are missing, display a `<nimble-banner severity="warning">` expla
    a. Download `.nipkg` from feed via `getNifeedV1FeedsByFeedIdFilesByFileName()`
    b. Create a new webapp in two steps:
    - `createWebapp({ name, workspace })` — the WebApp Service rejects custom property keys on the create endpoint, so `properties` must **not** be passed here
-  - `updateWebapp(id, { properties })` — set all `slPluginManager.*` metadata (see §8) in a subsequent update call
-     c. Upload the `.nipkg` directly: `updateContent({ id }, nipkgBlob)` — no extraction needed
+
+- `updateWebapp(id, { properties })` — set all `slPluginManager.*` metadata (see §8) in a subsequent update call
+  c. Upload the `.nipkg` directly: `updateContent({ id }, nipkgBlob)` — no extraction needed
+
 10. Status updates via banner confirmation; installed status refreshed by re-listing webapps
 
 #### Upgrade
@@ -249,23 +251,23 @@ If permissions are missing, display a `<nimble-banner severity="warning">` expla
 
 ### 4.4 API surface needed
 
-| Operation                 | Service        | SDK client         | SDK function                                                              | Endpoint                                           |
-| ------------------------- | -------------- | ------------------ | ------------------------------------------------------------------------- | -------------------------------------------------- |
-| List feeds (discovery)    | Feed Service   | `#feeds`           | `getNifeedV1Feeds()`                                                      | `GET /nifeed/v1/feeds`                             |
-| List feed packages        | Feed Service   | `#feeds`           | `getNifeedV1FeedsByFeedIdPackages()`                                      | `GET /nifeed/v1/feeds/{feedId}/packages`           |
-| Get single package        | Feed Service   | `#feeds`           | `getNifeedV1PackagesByPackageId()`                                        | `GET /nifeed/v1/packages/{packageId}`              |
-| Download Packages index   | Feed Service   | `#feeds`           | `getNifeedV1FeedsByFeedIdFilesPackages()`                                 | `GET /nifeed/v1/feeds/{feedId}/files/Packages`     |
-| Download package file     | Feed Service   | `#feeds`           | `getNifeedV1FeedsByFeedIdFilesByFileName()`                               | `GET /nifeed/v1/feeds/{feedId}/files/{fileName}`   |
-| Trigger feed sync         | Feed Service   | `#feeds`           | `postNifeedV1ReplicateFeed()`                                             | `POST /nifeed/v1/replicate-feed`                   |
-| Check for updates         | Feed Service   | `#feeds`           | `postNifeedV1FeedsByFeedIdCheckForUpdates()`                              | `POST /nifeed/v1/feeds/{feedId}/check-for-updates` |
-| Apply updates             | Feed Service   | `#feeds`           | `postNifeedV1FeedsByFeedIdApplyUpdates()`                                 | `POST /nifeed/v1/feeds/{feedId}/apply-updates`     |
-| Create webapp (metadata)  | WebApp Service | `#web-application` | `createWebapp({ body: { name, workspace, properties } })`                 | `POST /niapp/v1/webapps`                           |
-| Upload `.nipkg` to webapp | WebApp Service | `#web-application` | `updateContent({ path: { id }, body: nipkgBlob })`                        | `PUT /niapp/v1/webapps/{id}/content`               |
-| List installed webapps    | WebApp Service | `#web-application` | `listWebapps({ query: { workspace } })`                                   | `GET /niapp/v1/webapps`                            |
-| Query webapps (advanced)  | WebApp Service | `#web-application` | `query({ body: { filter, take, orderBy } })`                              | `POST /niapp/v1/query-webapps`                     |
-| Get webapp details        | WebApp Service | `#web-application` | `getWebapp({ path: { id } })`                                             | `GET /niapp/v1/webapps/{id}`                       |
-| Update webapp metadata    | WebApp Service | `#web-application` | `updateWebapp({ path: { id }, body })`                                    | `PUT /niapp/v1/webapps/{id}`                       |
-| Delete a webapp           | WebApp Service | `#web-application` | `deleteWebapp({ path: { id } })`                                          | `DELETE /niapp/v1/webapps/{id}`                    |
+| Operation                 | Service        | SDK client         | SDK function                                                                     | Endpoint                                           |
+| ------------------------- | -------------- | ------------------ | -------------------------------------------------------------------------------- | -------------------------------------------------- |
+| List feeds (discovery)    | Feed Service   | `#feeds`           | `getNifeedV1Feeds()`                                                             | `GET /nifeed/v1/feeds`                             |
+| List feed packages        | Feed Service   | `#feeds`           | `getNifeedV1FeedsByFeedIdPackages()`                                             | `GET /nifeed/v1/feeds/{feedId}/packages`           |
+| Get single package        | Feed Service   | `#feeds`           | `getNifeedV1PackagesByPackageId()`                                               | `GET /nifeed/v1/packages/{packageId}`              |
+| Download Packages index   | Feed Service   | `#feeds`           | `getNifeedV1FeedsByFeedIdFilesPackages()`                                        | `GET /nifeed/v1/feeds/{feedId}/files/Packages`     |
+| Download package file     | Feed Service   | `#feeds`           | `getNifeedV1FeedsByFeedIdFilesByFileName()`                                      | `GET /nifeed/v1/feeds/{feedId}/files/{fileName}`   |
+| Trigger feed sync         | Feed Service   | `#feeds`           | `postNifeedV1ReplicateFeed()`                                                    | `POST /nifeed/v1/replicate-feed`                   |
+| Check for updates         | Feed Service   | `#feeds`           | `postNifeedV1FeedsByFeedIdCheckForUpdates()`                                     | `POST /nifeed/v1/feeds/{feedId}/check-for-updates` |
+| Apply updates             | Feed Service   | `#feeds`           | `postNifeedV1FeedsByFeedIdApplyUpdates()`                                        | `POST /nifeed/v1/feeds/{feedId}/apply-updates`     |
+| Create webapp (metadata)  | WebApp Service | `#web-application` | `createWebapp({ body: { name, workspace, properties } })`                        | `POST /niapp/v1/webapps`                           |
+| Upload `.nipkg` to webapp | WebApp Service | `#web-application` | `updateContent({ path: { id }, body: nipkgBlob })`                               | `PUT /niapp/v1/webapps/{id}/content`               |
+| List installed webapps    | WebApp Service | `#web-application` | `listWebapps({ query: { workspace } })`                                          | `GET /niapp/v1/webapps`                            |
+| Query webapps (advanced)  | WebApp Service | `#web-application` | `query({ body: { filter, take, orderBy } })`                                     | `POST /niapp/v1/query-webapps`                     |
+| Get webapp details        | WebApp Service | `#web-application` | `getWebapp({ path: { id } })`                                                    | `GET /niapp/v1/webapps/{id}`                       |
+| Update webapp metadata    | WebApp Service | `#web-application` | `updateWebapp({ path: { id }, body })`                                           | `PUT /niapp/v1/webapps/{id}`                       |
+| Delete a webapp           | WebApp Service | `#web-application` | `deleteWebapp({ path: { id } })`                                                 | `DELETE /niapp/v1/webapps/{id}`                    |
 | Read feed config          | WebApp Service | `#web-application` | `getWebapp({ path: { id } })` then read `properties['slPluginManager.feeds']`    | `GET /niapp/v1/webapps/{pluginManagerId}`          |
 | Save feed config          | WebApp Service | `#web-application` | `updateWebapp({ path: { id }, body: { properties } })`                           | `PUT /niapp/v1/webapps/{pluginManagerId}`          |
 | Discover installed apps   | WebApp Service | `#web-application` | `listWebapps()` paginated, filter by `properties['slPluginManager.packageName']` | `GET /niapp/v1/webapps`                            |
@@ -445,14 +447,14 @@ Installed plugin metadata (per-workspace webapp IDs, versions, timestamps) is st
 
 ### 6.1 How Homebrew does it
 
-| Homebrew concept                                                             | Plugin Manager equivalent                                               |
-| ---------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Homebrew concept                                                             | Plugin Manager equivalent                                                   |
+| ---------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
 | **Tap** — a GitHub repo containing formulae                                  | Our GitHub `systemlink-plugin-manager` repo containing the `Packages` index |
-| **Formula / Cask** — a Ruby file describing how to install                   | A stanza in the `Packages` file + the `.nipkg` binary in `pool/`        |
-| **`brew tap`** — register a third-party tap                                  | `slcli plugin-manager feed add <URL>` — register a new feed source      |
-| **`brew install`** — install from default or tapped repo                     | `slcli plugin-manager install <name>`                                   |
-| **PR-based submission** — contributors submit a PR adding/updating a formula | Contributors submit a PR adding their `.nipkg` to `pool/` with metadata |
-| **CI validation** — `brew audit`, `brew test` on PR                          | GitHub Actions validates package metadata, checksums, structure         |
+| **Formula / Cask** — a Ruby file describing how to install                   | A stanza in the `Packages` file + the `.nipkg` binary in `pool/`            |
+| **`brew tap`** — register a third-party tap                                  | `slcli plugin-manager feed add <URL>` — register a new feed source          |
+| **`brew install`** — install from default or tapped repo                     | `slcli plugin-manager install <name>`                                       |
+| **PR-based submission** — contributors submit a PR adding/updating a formula | Contributors submit a PR adding their `.nipkg` to `pool/` with metadata     |
+| **CI validation** — `brew audit`, `brew test` on PR                          | GitHub Actions validates package metadata, checksums, structure             |
 
 ### 6.2 Submission workflow
 
@@ -563,7 +565,7 @@ A `.nipkg` package for the Plugin Manager is the standard NI Package format — 
 1. CLI/webapp downloads `.nipkg` from the feed via `getNifeedV1FeedsByFeedIdFilesByFileName()`
 2. Creates a new webapp in two steps:
    a. `createWebapp({ body: { name, workspace } })` — the WebApp Service rejects custom property keys at create time — returns the new webapp `id`
-  b. `updateWebapp({ path: { id }, body: { properties } })` — sets all `slPluginManager.*` metadata (see §8)
+   b. `updateWebapp({ path: { id }, body: { properties } })` — sets all `slPluginManager.*` metadata (see §8)
 3. Uploads the `.nipkg` directly: `updateContent({ path: { id }, body: nipkgBlob })` — the WebApp Service handles extraction internally
 4. The `slPluginManager.*` properties on the webapp (see §8.2) serve as the install record — no separate tracking step required
 
@@ -614,14 +616,14 @@ Both the official curated feed and any customer-provided feeds (replicated from 
 
 When an app is installed through the Plugin Manager, the created webapp receives a set of well-known `slPluginManager.*` properties that mark it as Plugin Manager-managed and record the install metadata:
 
-| Property key           | Description                                                      | Example                      |
-| ---------------------- | ---------------------------------------------------------------- | ---------------------------- |
-| `slPluginManager.packageName` | Plugin package identifier                                  | `mycompany-asset-dashboard`  |
-| `slPluginManager.version`     | Installed semantic version                                  | `1.2.0`                      |
-| `slPluginManager.type`        | Resource type                                               | `webapp`                     |
-| `slPluginManager.feedId`      | Feed Service feed ID this was installed from                | `db7c157d-…`                 |
-| `slPluginManager.feedUrl`     | Source URL of the feed                                      | `https://<org>.github.io/…/` |
-| `slPluginManager.installedAt` | ISO 8601 install timestamp                                  | `2026-03-01T10:00:00Z`       |
+| Property key                  | Description                                                      | Example                      |
+| ----------------------------- | ---------------------------------------------------------------- | ---------------------------- |
+| `slPluginManager.packageName` | Plugin package identifier                                        | `mycompany-asset-dashboard`  |
+| `slPluginManager.version`     | Installed semantic version                                       | `1.2.0`                      |
+| `slPluginManager.type`        | Resource type                                                    | `webapp`                     |
+| `slPluginManager.feedId`      | Feed Service feed ID this was installed from                     | `db7c157d-…`                 |
+| `slPluginManager.feedUrl`     | Source URL of the feed                                           | `https://<org>.github.io/…/` |
+| `slPluginManager.installedAt` | ISO 8601 install timestamp                                       | `2026-03-01T10:00:00Z`       |
 | `slPluginManager.updatedAt`   | ISO 8601 last-upgrade timestamp (empty string if never upgraded) | `2026-03-09T14:30:00Z`       |
 
 The presence of `slPluginManager.packageName` on a webapp is the signal that it was installed through the Plugin Manager.
@@ -678,37 +680,37 @@ Both the webapp and CLI may update a webapp's properties. Use optimistic concurr
 
 The following questions were raised during initial requirements drafting and have been resolved:
 
-| #   | Question                         | Decision                                                                                                                                                                                                                                             |
-| --- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | GitHub hosting mechanism         | **Hybrid:** `Packages` index via GitHub Pages, `.nipkg` binaries via GitHub Releases                                                                                                                                                                 |
-| 2   | Package size limits              | **100 MB** max per `.nipkg` (GitHub Release asset limit is 2 GB, so plenty of headroom)                                                                                                                                                              |
-| 3   | Feed signing                     | **Supported but not blocking.** Architecture includes OpenPGP signing support; will enable once the NI private key is located                                                                                                                        |
-| 4   | Architecture                     | **`windows_all`** for all Plugin Manager packages (webapps are platform-independent)                                                                                                                                                                 |
-| 5   | Versioning                       | **Semantic versioning enforced** (`MAJOR.MINOR.PATCH`). CI rejects non-semver versions                                                                                                                                                               |
-| 6   | Install format                   | **Keep `.nipkg`** for compatibility with the existing Feed Service replication pipeline                                                                                                                                                              |
-| 7   | Install manifest / config        | **WebApp Service `properties`** — feed config stored on the Plugin Manager webapp itself (`slPluginManager.feeds`); installed app metadata stored as `slPluginManager.*` properties on each installed webapp. No Tag Service dependency. (see §8) |
-| 8   | Dependency resolution            | **Not required** initially. Keep it simple. `Depends` field is informational only                                                                                                                                                                    |
-| 9   | Multi-workspace                  | **Supported.** Install flow allows choosing one or more workspaces; can add/remove workspaces later                                                                                                                                                  |
-| 10  | Feed ID discovery                | **From config cache.** Feed ID stored in `~/.config/slcli/plugin-manager.json` at `feed add` time. No name-based Feed Service scan. Webapp reads from its own `slPluginManager.feeds` property.                                                    |
-| 11  | Screenshots / icons              | **Base64-encoded** in package `attributes`. Max **3 screenshots** per app. `Packages.gz` for bandwidth. Survives replication, no external requests needed                                                                                            |
-| 12  | Install permissions              | **Existing Web Application permissions** apply. Webapp checks permissions on launch and shows guidance                                                                                                                                               |
-| 13  | Ratings / reviews                | **No.** Not in scope                                                                                                                                                                                                                                 |
-| 14  | Publishing model                 | **Curated.** Submissions require functional testing and security audit by maintainers                                                                                                                                                                |
-| 15  | Update notifications             | **In-app only.** Updates shown when the user opens the Plugin Manager UI                                                                                                                                                                             |
-| 16  | Naming conflicts                 | **First-come-first-served.** CI rejects duplicate package names from different authors                                                                                                                                                               |
-| 17  | Delisting                        | **Mark deprecated** in metadata → warning badge → remove after grace period                                                                                                                                                                          |
-| 18  | Commercial apps                  | **Future consideration.** Start with free/open-source; may support paid apps later                                                                                                                                                                   |
-| 19  | CLI GitHub access                | **Yes.** `slcli plugin-manager` supports `--source github` to browse/install directly from GitHub for dev/testing                                                                                                                                   |
-| 20  | CI/CD integration                | **Yes.** `slcli plugin-manager publish --prepare-pr` generates a ready-to-commit branch                                                                                                                                                             |
-| 21  | Packages file size with base64   | **Acceptable.** Several megabytes is fine. Cap screenshots at 3 per app. Use `Packages.gz` for feed replication                                                                                                                                      |
-| 22  | Feed replication frequency       | **Manual.** Feed refresh is not automatic. Users trigger via "Refresh Feed" button in webapp or `slcli plugin-manager feed refresh` CLI command                                                                                                     |
-| 23  | `.nipkg` extraction in browser   | **Not needed.** The WebApp Service accepts `.nipkg` files directly via `updateContent()`. No browser-side or server-side extraction required                                                                                                         |
-| 24  | WebApp Service API for install   | **Use `#web-application` client.** `createWebapp()` + `updateContent(id, nipkgBlob)` for install; `updateContent()` for upgrade; `deleteWebapp()` for uninstall                                                                                      |
-| 25  | Install tracking                 | **WebApp properties.** `slPluginManager.*` properties on each installed webapp. Cross-workspace "Installed" view lists all webapps with `slPluginManager.packageName` present. No Tag Service dependency.                                           |
-| 26  | Catalog performance / pagination | **Feed Service does not appear to support pagination.** Validate performance later with real data. Client-side filtering is the initial approach                                                                                                     |
-| 27  | Onboarding (first-time setup)    | **Yes.** Webapp shows an onboarding wizard that replicates the feed from GitHub on the user's behalf (see §4.6)                                                                                                                                      |
+| #   | Question                         | Decision                                                                                                                                                                                                                                                                   |
+| --- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | GitHub hosting mechanism         | **Hybrid:** `Packages` index via GitHub Pages, `.nipkg` binaries via GitHub Releases                                                                                                                                                                                       |
+| 2   | Package size limits              | **100 MB** max per `.nipkg` (GitHub Release asset limit is 2 GB, so plenty of headroom)                                                                                                                                                                                    |
+| 3   | Feed signing                     | **Supported but not blocking.** Architecture includes OpenPGP signing support; will enable once the NI private key is located                                                                                                                                              |
+| 4   | Architecture                     | **`windows_all`** for all Plugin Manager packages (webapps are platform-independent)                                                                                                                                                                                       |
+| 5   | Versioning                       | **Semantic versioning enforced** (`MAJOR.MINOR.PATCH`). CI rejects non-semver versions                                                                                                                                                                                     |
+| 6   | Install format                   | **Keep `.nipkg`** for compatibility with the existing Feed Service replication pipeline                                                                                                                                                                                    |
+| 7   | Install manifest / config        | **WebApp Service `properties`** — feed config stored on the Plugin Manager webapp itself (`slPluginManager.feeds`); installed app metadata stored as `slPluginManager.*` properties on each installed webapp. No Tag Service dependency. (see §8)                          |
+| 8   | Dependency resolution            | **Not required** initially. Keep it simple. `Depends` field is informational only                                                                                                                                                                                          |
+| 9   | Multi-workspace                  | **Supported.** Install flow allows choosing one or more workspaces; can add/remove workspaces later                                                                                                                                                                        |
+| 10  | Feed ID discovery                | **From config cache.** Feed ID stored in `~/.config/slcli/plugin-manager.json` at `feed add` time. No name-based Feed Service scan. Webapp reads from its own `slPluginManager.feeds` property.                                                                            |
+| 11  | Screenshots / icons              | **Base64-encoded** in package `attributes`. Max **3 screenshots** per app. `Packages.gz` for bandwidth. Survives replication, no external requests needed                                                                                                                  |
+| 12  | Install permissions              | **Existing Web Application permissions** apply. Webapp checks permissions on launch and shows guidance                                                                                                                                                                     |
+| 13  | Ratings / reviews                | **No.** Not in scope                                                                                                                                                                                                                                                       |
+| 14  | Publishing model                 | **Curated.** Submissions require functional testing and security audit by maintainers                                                                                                                                                                                      |
+| 15  | Update notifications             | **In-app only.** Updates shown when the user opens the Plugin Manager UI                                                                                                                                                                                                   |
+| 16  | Naming conflicts                 | **First-come-first-served.** CI rejects duplicate package names from different authors                                                                                                                                                                                     |
+| 17  | Delisting                        | **Mark deprecated** in metadata → warning badge → remove after grace period                                                                                                                                                                                                |
+| 18  | Commercial apps                  | **Future consideration.** Start with free/open-source; may support paid apps later                                                                                                                                                                                         |
+| 19  | CLI GitHub access                | **Yes.** `slcli plugin-manager` supports `--source github` to browse/install directly from GitHub for dev/testing                                                                                                                                                          |
+| 20  | CI/CD integration                | **Yes.** `slcli plugin-manager publish --prepare-pr` generates a ready-to-commit branch                                                                                                                                                                                    |
+| 21  | Packages file size with base64   | **Acceptable.** Several megabytes is fine. Cap screenshots at 3 per app. Use `Packages.gz` for feed replication                                                                                                                                                            |
+| 22  | Feed replication frequency       | **Manual.** Feed refresh is not automatic. Users trigger via "Refresh Feed" button in webapp or `slcli plugin-manager feed refresh` CLI command                                                                                                                            |
+| 23  | `.nipkg` extraction in browser   | **Not needed.** The WebApp Service accepts `.nipkg` files directly via `updateContent()`. No browser-side or server-side extraction required                                                                                                                               |
+| 24  | WebApp Service API for install   | **Use `#web-application` client.** `createWebapp()` + `updateContent(id, nipkgBlob)` for install; `updateContent()` for upgrade; `deleteWebapp()` for uninstall                                                                                                            |
+| 25  | Install tracking                 | **WebApp properties.** `slPluginManager.*` properties on each installed webapp. Cross-workspace "Installed" view lists all webapps with `slPluginManager.packageName` present. No Tag Service dependency.                                                                  |
+| 26  | Catalog performance / pagination | **Feed Service does not appear to support pagination.** Validate performance later with real data. Client-side filtering is the initial approach                                                                                                                           |
+| 27  | Onboarding (first-time setup)    | **Yes.** Webapp shows an onboarding wizard that replicates the feed from GitHub on the user's behalf (see §4.6)                                                                                                                                                            |
 | 28  | Bootstrap (self-hosting)         | **Manual bootstrap.** User downloads `systemlink-plugin-manager.nipkg` from GitHub Releases, uploads via SystemLink WebApp UI, then launches the Plugin Manager to complete onboarding. A GitHub Pages landing page will eventually provide a polished download experience |
-| 29  | Commercial app licensing         | **Ignore for now.** Not in initial scope                                                                                                                                                                                                             |
+| 29  | Commercial app licensing         | **Ignore for now.** Not in initial scope                                                                                                                                                                                                                                   |
 
 ---
 
