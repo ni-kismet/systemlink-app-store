@@ -24,6 +24,8 @@ from submission_utils import (
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SUBMISSIONS_DIR = REPO_ROOT / "submissions"
 SCHEMA_PATH = REPO_ROOT / "app-manifest.schema.json"
+GIT_COMMIT_NAME = "github-actions[bot]"
+GIT_COMMIT_EMAIL = "41898282+github-actions[bot]@users.noreply.github.com"
 
 
 def validate_manifest(manifest: dict) -> list[str]:
@@ -49,7 +51,14 @@ def download_submission_file(url: str, dest: Path) -> None:
 
 def git(*args: str, check: bool = True) -> subprocess.CompletedProcess:
     return subprocess.run(
-        ["git", *args],
+        [
+            "git",
+            "-c",
+            f"user.name={GIT_COMMIT_NAME}",
+            "-c",
+            f"user.email={GIT_COMMIT_EMAIL}",
+            *args,
+        ],
         cwd=REPO_ROOT,
         check=check,
         capture_output=True,
