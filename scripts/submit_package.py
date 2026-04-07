@@ -87,6 +87,23 @@ def resolve_nipkg(
     )
 
 
+def refresh_remote_submission_branch(branch: str) -> None:
+    fetch_result = git(
+        "fetch",
+        "origin",
+        f"+refs/heads/{branch}:refs/remotes/origin/{branch}",
+        check=False,
+    )
+    if fetch_result.returncode == 0:
+        return
+
+    stderr = fetch_result.stderr.lower()
+    if "couldn't find remote ref" in stderr or "not our ref" in stderr:
+        return
+
+    raise RuntimeError(fetch_result.stderr.strip() or f"Failed to fetch remote branch {branch}")
+
+
 def create_submission_branch(
     manifest: dict,
     nipkg_path: Path,
@@ -127,6 +144,7 @@ def create_submission_branch(
 
     branch = f"submit/{package}-v{version}"
     git("fetch", "origin", "main")
+    refresh_remote_submission_branch(branch)
     git("checkout", "-B", branch, "origin/main")
     git("add", str(submission_dir.relative_to(REPO_ROOT)))
 
