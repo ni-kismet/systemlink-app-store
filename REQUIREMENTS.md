@@ -56,7 +56,7 @@ Publishing is **curated**: all submissions go through a PR-based review process 
 
 - The Plugin Manager **webapp** can only call APIs on its own SystemLink origin (CSP `connect-src 'self'`). It cannot reach GitHub directly. Therefore it must read from the **replicated local feed**, not the GitHub URL.
 - The `slcli`, running outside the browser, has no such restriction and **can read GitHub directly** for development and testing scenarios (`--source github`).
-- All packages use `windows_all` architecture since webapps are platform-independent.
+- Platform-independent webapp packages use `all` architecture.
 - All packages must use **semantic versioning** (semver: `MAJOR.MINOR.PATCH`).
 
 ---
@@ -74,7 +74,7 @@ Control file fields follow the [NI Package Manager control file attributes](http
 - **`Package` naming**: Must match `^[a-z0-9][a-z0-9.+-]{2,}$`, max 58 characters, lowercase only.
 - **`Maintainer` format**: `Name <email>` (angle brackets required), e.g., `Acme Corp <apps@acme.com>`.
 - **`XB-` prefix**: Non-standard extended binary attributes **must** use the `XB-` prefix in the control file (e.g., `XB-DisplayName`, `XB-UserVisible`, `XB-Plugin`). This is the standard Debian convention for custom fields adopted by NI Package Manager.
-- **`XB-Plugin: file`**: Required for all packages. Tells NI Package Manager this is a file-based package (no installer plugin).
+- **`XB-Plugin`**: Required for all packages and must carry the Plugin Manager resource type (`webapp`, `notebook`, `dashboard`, `routine`, or `bundle`).
 - **Feed Service prefix stripping**: The SystemLink Feed Service is expected to **strip the `XB-` prefix** when populating `metadata.attributes` (e.g., `XB-DisplayName` → `DisplayName`). However, this behaviour has not been confirmed to be consistent across all Feed Service versions. Reader code (webapp, CLI) should therefore **check both bare and `XB-`-prefixed attribute names** as a defensive measure — prefer the bare name but fall back to the `XB-`-prefixed variant if absent.
 
 #### Standard control file fields
@@ -85,7 +85,7 @@ These fields are written to the nipkg control file and mapped by the Feed Servic
 | ------------------- | ------------------------- | -------------------------------------------------------------------------------------- |
 | `Package`           | `packageName`             | Unique identifier (`^[a-z0-9][a-z0-9.+-]{2,}$`, max 58 chars), first-come-first-served |
 | `Version`           | `version`                 | **Semantic version** string (`MAJOR.MINOR.PATCH`, e.g., `1.2.0`)                       |
-| `Architecture`      | `architecture`            | Always `windows_all` for Plugin Manager packages                                       |
+| `Architecture`      | `architecture`            | `all` for platform-independent Plugin Manager webapp packages                          |
 | `Description`       | `description`             | Multi-line description of the app (≥ 20 characters)                                    |
 | `Section`           | `section`                 | Fine-grained category shown in the Plugin Manager catalog                              |
 | `Maintainer`        | `maintainer`              | Author name and email, format: `Name <email>`                                          |
@@ -134,16 +134,16 @@ systemlink-plugin-manager/
 ├── Packages.gz                       # Compressed index (for large catalogs)
 ├── submissions/                      # PR staging area for new/updated apps
 │   └── mycompany-asset-dashboard/
-│       ├── manifest.json             # App metadata (used to generate Packages stanza)
-│       ├── icon.svg                  # App icon (auto-base64-encoded into attributes)
-│       └── screenshot.png            # Screenshot (auto-base64-encoded into attributes)
+│       ├── manifest.json             # Thin submission manifest (artifact path + SHA)
+│       ├── mycompany-asset-dashboard_1.0.0_all.nipkg
+│       └── screenshot.png            # Optional screenshot (base64-encoded into attributes)
 ├── CONTRIBUTING.md                   # How to submit an app (see §6)
 ├── app-manifest.schema.json          # JSON Schema for manifest.json validation
 └── .github/
     └── workflows/
-        ├── validate-submission.yml   # PR validation: lint metadata, check checksums
-        ├── rebuild-index.yml         # On merge: regenerate Packages, base64-encode assets
-        └── publish-release.yml       # Attach .nipkg to GitHub Release, update Packages
+        ├── validate-submission.yml   # PR validation: validate thin manifest, verify artifact SHA, inspect package metadata
+        ├── accept-submission.yml     # Accept cross-repo submissions and open a PR from the reviewed artifact
+        └── publish-release.yml       # Attach .nipkg to GitHub Release and update Packages
 ```
 
 ### 3.3 Hybrid hosting model
@@ -159,7 +159,7 @@ This URL is used as the `packageSources` entry when creating the replicated feed
 **`.nipkg` binaries** — attached as **GitHub Release assets** (up to 2 GB per asset, no LFS needed). The `Filename` field in each `Packages` stanza points to the release asset URL:
 
 ```
-https://github.com/<org>/systemlink-plugin-manager/releases/download/v1.0.0/myapp_1.0.0_windows_all.nipkg
+https://github.com/<org>/systemlink-plugin-manager/releases/download/v1.0.0/myapp_1.0.0_all.nipkg
 ```
 
 This hybrid approach keeps the git repository lean (no large binaries committed) while still serving a valid feed structure that SystemLink's Feed Service can replicate.
@@ -402,20 +402,20 @@ slcli plugin-manager publish <WEBAPP_DIR> [--manifest <FILE>] [OPTIONS]
     # ready for submission to the GitHub feed via PR.
     # Reads metadata from nipkg.config.json in WEBAPP_DIR by default, or from
     # --manifest <file> if specified. CLI flags override individual config fields.
-    # nipkg.config.json uses the same field names as manifest.json (package,
-    # version, displayName, section, xbPlugin, license, and related fields so the submission
-    # manifest is generated automatically by dropping build-only fields.
+    # nipkg.config.json carries package metadata (package, version, displayName,
+    # section, xbPlugin, license, and related fields). The submission manifest is
+    # generated from the built artifact's filename, SHA256, and provenance metadata.
     # Validates semver format, required Plugin Manager fields, and license presence.
-    # Outputs: <package>_<version>_windows_all.nipkg + submissions/<package>/manifest.json
+    # Outputs: <package>_<version>_all.nipkg + submissions/<package>/manifest.json
     # With --prepare-pr: creates a ready-to-commit branch with the .nipkg,
-    #   manifest.json, and base64-encoded assets, streamlining the PR workflow.
+    #   manifest.json, and any optional review assets, streamlining the PR workflow.
 
 slcli plugin-manager validate <NIPKG_FILE>
   # Validate a .nipkg against Plugin Manager metadata requirements:
     # - semver version format
     # - required metadata fields present
     # - SHA256 checksum valid
-    # - Architecture is windows_all
+    # - Architecture is valid for the package type (`all` for webapps)
     # - Size ≤ 100MB
     # - Contains valid webapp structure (index.html at root)
     # - License specified
@@ -450,10 +450,10 @@ Installed plugin metadata (per-workspace webapp IDs, versions, timestamps) is st
 | Homebrew concept                                                             | Plugin Manager equivalent                                                   |
 | ---------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
 | **Tap** — a GitHub repo containing formulae                                  | Our GitHub `systemlink-plugin-manager` repo containing the `Packages` index |
-| **Formula / Cask** — a Ruby file describing how to install                   | A stanza in the `Packages` file + the `.nipkg` binary in `pool/`            |
+| **Formula / Cask** — a Ruby file describing how to install                   | A stanza in the `Packages` file + the reviewed `.nipkg` artifact            |
 | **`brew tap`** — register a third-party tap                                  | `slcli plugin-manager feed add <URL>` — register a new feed source          |
 | **`brew install`** — install from default or tapped repo                     | `slcli plugin-manager install <name>`                                       |
-| **PR-based submission** — contributors submit a PR adding/updating a formula | Contributors submit a PR adding their `.nipkg` to `pool/` with metadata     |
+| **PR-based submission** — contributors submit a PR adding/updating a formula | Contributors submit a PR with a thin `manifest.json`, the reviewed `.nipkg`, and any optional screenshots |
 | **CI validation** — `brew audit`, `brew test` on PR                          | GitHub Actions validates package metadata, checksums, structure             |
 
 ### 6.2 Submission workflow
@@ -465,13 +465,12 @@ Developer                                GitHub Repo                          Ma
    `ng build --prod`
        │
 2. Package with
-  `slcli plugin-manager publish dist/browser/ --prepare-pr`
-       │ (reads metadata from dist/browser/nipkg.config.json;
-       │  nipkg.config.json uses the same field names as manifest.json)
+   `slcli plugin-manager publish dist/browser/ --prepare-pr`
+       │ (reads package metadata from dist/browser/nipkg.config.json)
        │ Generates:
        │  - .nipkg file
-       │  - submissions/my-app/manifest.json (derived from nipkg.config.json)
-       │  - base64-encoded icon + screenshot
+       │  - submissions/my-app/manifest.json (thin manifest with nipkgFile + sha256)
+       │  - optional screenshots for review
        │  - ready-to-commit branch
        ▼
 3. Fork repo, push branch with
@@ -479,14 +478,12 @@ Developer                                GitHub Repo                          Ma
        │
 4. Open Pull Request ──────────────►  5. CI validates:
                                          - manifest.json against schema
-                                         - semver version format
-                                         - Architecture == windows_all
                                          - checksums match .nipkg
-                                         - required fields present
+                                         - package metadata extracted from the .nipkg
                                          - no duplicate package names
                                          - .nipkg structure valid (index.html)
                                          - size ≤ 100 MB
-                                         - license specified
+                                         - required Plugin Manager metadata present
                                              │
                                              ▼
                                       6. Maintainer review:
@@ -514,12 +511,11 @@ Developer                                GitHub Repo                          Ma
 - Must include the required Plugin Manager metadata (`Section`, `XB-Plugin`, `XB-SlPluginManagerLicense`, and any optional `XB-SlPluginManager*` fields) — see §3.1 for all required fields
 - `.nipkg` must contain a valid resource (webapp: `index.html` at root; notebook: `.ipynb` file; dashboard: `.json` file)
 - No external network calls outside of SystemLink's own APIs (CSP compliance)
-- Must provide a `SlPluginManagerIcon` (SVG or PNG, max 128x128) — CI will base64-encode it
+- Must provide an embedded `SlPluginManagerIcon` (SVG or PNG, max 128x128) in the `.nipkg`
 - Description must be ≥ 20 characters
-- License must be specified
+- License must be specified in the package metadata
 - SHA256 checksum must match
 - Version must be valid **semver** (`MAJOR.MINOR.PATCH`)
-- Architecture must be `windows_all`
 - Package size must not exceed **100 MB**
 - Package name is **first-come-first-served** — CI rejects duplicate names from different authors
 
@@ -685,14 +681,14 @@ The following questions were raised during initial requirements drafting and hav
 | 1   | GitHub hosting mechanism         | **Hybrid:** `Packages` index via GitHub Pages, `.nipkg` binaries via GitHub Releases                                                                                                                                                                                       |
 | 2   | Package size limits              | **100 MB** max per `.nipkg` (GitHub Release asset limit is 2 GB, so plenty of headroom)                                                                                                                                                                                    |
 | 3   | Feed signing                     | **Supported but not blocking.** Architecture includes OpenPGP signing support; will enable once the NI private key is located                                                                                                                                              |
-| 4   | Architecture                     | **`windows_all`** for all Plugin Manager packages (webapps are platform-independent)                                                                                                                                                                                       |
+| 4   | Architecture                     | **`all`** for platform-independent Plugin Manager webapp packages                                                                                                                                                                                                          |
 | 5   | Versioning                       | **Semantic versioning enforced** (`MAJOR.MINOR.PATCH`). CI rejects non-semver versions                                                                                                                                                                                     |
 | 6   | Install format                   | **Keep `.nipkg`** for compatibility with the existing Feed Service replication pipeline                                                                                                                                                                                    |
 | 7   | Install manifest / config        | **WebApp Service `properties`** — feed config stored on the Plugin Manager webapp itself (`slPluginManager.feeds`); installed app metadata stored as `slPluginManager.*` properties on each installed webapp. No Tag Service dependency. (see §8)                          |
 | 8   | Dependency resolution            | **Not required** initially. Keep it simple. `Depends` field is informational only                                                                                                                                                                                          |
 | 9   | Multi-workspace                  | **Supported.** Install flow allows choosing one or more workspaces; can add/remove workspaces later                                                                                                                                                                        |
 | 10  | Feed ID discovery                | **From config cache.** Feed ID stored in `~/.config/slcli/plugin-manager.json` at `feed add` time. No name-based Feed Service scan. Webapp reads from its own `slPluginManager.feeds` property.                                                                            |
-| 11  | Screenshots / icons              | **Base64-encoded** in package `attributes`. Max **3 screenshots** per app. `Packages.gz` for bandwidth. Survives replication, no external requests needed                                                                                                                  |
+| 11  | Screenshots / icons              | **Icon embedded in the `.nipkg`; screenshots base64-encoded in `Packages` attributes.** Max **3 screenshots** per app. `Packages.gz` for bandwidth. Survives replication, no external requests needed                                                                    |
 | 12  | Install permissions              | **Existing Web Application permissions** apply. Webapp checks permissions on launch and shows guidance                                                                                                                                                                     |
 | 13  | Ratings / reviews                | **No.** Not in scope                                                                                                                                                                                                                                                       |
 | 14  | Publishing model                 | **Curated.** Submissions require functional testing and security audit by maintainers                                                                                                                                                                                      |
@@ -702,7 +698,7 @@ The following questions were raised during initial requirements drafting and hav
 | 18  | Commercial apps                  | **Future consideration.** Start with free/open-source; may support paid apps later                                                                                                                                                                                         |
 | 19  | CLI GitHub access                | **Yes.** `slcli plugin-manager` supports `--source github` to browse/install directly from GitHub for dev/testing                                                                                                                                                          |
 | 20  | CI/CD integration                | **Yes.** `slcli plugin-manager publish --prepare-pr` generates a ready-to-commit branch                                                                                                                                                                                    |
-| 21  | Packages file size with base64   | **Acceptable.** Several megabytes is fine. Cap screenshots at 3 per app. Use `Packages.gz` for feed replication                                                                                                                                                            |
+| 21  | Packages file size with base64   | **Acceptable.** Several megabytes is fine. Cap screenshots at 3 per app and keep the icon embedded in the `.nipkg`. Use `Packages.gz` for feed replication                                                                                                                |
 | 22  | Feed replication frequency       | **Manual.** Feed refresh is not automatic. Users trigger via "Refresh Feed" button in webapp or `slcli plugin-manager feed refresh` CLI command                                                                                                                            |
 | 23  | `.nipkg` extraction in browser   | **Not needed.** The WebApp Service accepts `.nipkg` files directly via `updateContent()`. No browser-side or server-side extraction required                                                                                                                               |
 | 24  | WebApp Service API for install   | **Use `#web-application` client.** `createWebapp()` + `updateContent(id, nipkgBlob)` for install; `updateContent()` for upgrade; `deleteWebapp()` for uninstall                                                                                                            |
@@ -732,16 +728,16 @@ Remaining questions that need further investigation:
 
 - Define `app-manifest.schema.json` — JSON Schema for submission `manifest.json` files
 - Set up repository structure: `submissions/`, `Packages`, `Packages.gz`, `CONTRIBUTING.md`
-- Build `scripts/rebuild-index.py` — regenerate `Packages` / `Packages.gz` from submissions and GitHub Release assets, base64-encode icons and screenshots
-- GitHub Actions: `validate-submission.yml` — PR validation (lint manifest against schema, check semver, check `windows_all`, validate required fields, check size ≤ 100 MB, check no duplicate package names)
-- GitHub Actions: `rebuild-index.yml` — on merge to main, regenerate `Packages` index and deploy to GitHub Pages
+- Build `scripts/rebuild_index.py` — regenerate `Packages` / `Packages.gz` from submissions and GitHub Release assets, reuse the embedded icon, and base64-encode screenshots
+- GitHub Actions: `validate-submission.yml` — PR validation (lint manifest against schema, verify SHA256, inspect package metadata, check size ≤ 100 MB, check no duplicate package names)
+- GitHub Actions: `accept-submission.yml` — accept cross-repo submission payloads and open a PR from the reviewed artifact
 - GitHub Actions: `publish-release.yml` — attach `.nipkg` to GitHub Release, trigger index rebuild
 - Enable GitHub Pages to serve `Packages` / `Packages.gz` at the repository root
 - Manually curate 3–5 example app submissions to seed the catalog
 
 ### Phase 1b — CLI (`systemlink-cli` repo)
 
-- Build `slcli plugin-manager publish` to create `.nipkg` from a webapp build directory with base64-encoded icon
+- Build `slcli plugin-manager publish` to create a `.nipkg` from a webapp build directory with an embedded Plugin Manager icon and a generated thin submission manifest
 - Build `slcli plugin-manager validate` for pre-submission checks
 - Build `slcli plugin-manager install` / `uninstall` / `status` (using `#web-application` client: `createWebapp()` + `updateContent()`; installed state derived from `slPluginManager.*` webapp properties per §8)
 - Build `slcli plugin-manager feed sync` for manual feed refresh

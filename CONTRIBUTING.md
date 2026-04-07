@@ -10,8 +10,8 @@ The Plugin Manager uses a **curated, PR-based submission process** inspired by H
 
 - A built SystemLink webapp (Angular, WebVI, or other — must produce an `index.html` at the root)
 - The webapp packaged as a `.nipkg` file (see [Packaging your app](#packaging-your-app))
-- An app icon (SVG or PNG, max 128×128 px)
-- Optionally, up to 3 screenshots (PNG, max 800×600 px)
+- Package metadata embedded in the `.nipkg` control file, including `XB-DisplayName`, `XB-Plugin`, `XB-SlPluginManagerLicense`, and `XB-SlPluginManagerIcon`
+- Optionally, up to 3 screenshots (PNG, max 800×600 px) stored next to the submission manifest
 
 ## Submission process
 
@@ -21,31 +21,27 @@ Create a directory under `submissions/` with your package name:
 
 ```
 submissions/my-awesome-dashboard/
-├── manifest.json           # App metadata (see schema below)
-├── icon.svg                # App icon (SVG or PNG)
+├── manifest.json           # Thin submission manifest (artifact path + hash)
 ├── screenshot1.png         # Screenshot (optional, max 3)
 ├── screenshot2.png         # Screenshot (optional)
-└── my-awesome-dashboard_1.0.0_windows_all.nipkg
+└── my-awesome-dashboard_1.0.0_all.nipkg
 ```
 
 ### 2. Write your `manifest.json`
 
-Your `manifest.json` must conform to [`app-manifest.schema.json`](app-manifest.schema.json). Here's a minimal example:
+Your `manifest.json` must conform to [`app-manifest.schema.json`](app-manifest.schema.json). It no longer duplicates package metadata. CI derives package name, version, display name, description, maintainer, license, plugin type, and icon directly from the submitted `.nipkg`.
+
+Minimal example:
 
 ```json
 {
-  "package": "my-awesome-dashboard",
-  "version": "1.0.0",
-  "displayName": "My Awesome Dashboard",
-  "description": "A comprehensive dashboard for monitoring asset health and calibration status across your SystemLink fleet.",
-  "section": "Dashboard",
-  "maintainer": "Your Name <you@example.com>",
-  "homepage": "https://github.com/yourorg/my-awesome-dashboard",
-  "license": "MIT",
-  "xbPlugin": "webapp",
-  "slPluginManagerTags": "assets,calibration,dashboard,monitoring",
-  "slPluginManagerMinServerVersion": "2024 Q4",
-  "nipkgFile": "my-awesome-dashboard_1.0.0_windows_all.nipkg"
+  "schemaVersion": 2,
+  "nipkgFile": "my-awesome-dashboard_1.0.0_all.nipkg",
+  "sha256": "7b7f5d9c2d6e4d6f8d89b3a5b1f7dbe4b9f6b61f4c3b98b1e2f8d0a4c6d8e1f2",
+  "sourceRepo": "yourorg/my-awesome-dashboard",
+  "releaseTag": "my-awesome-dashboard-v1.0.0",
+  "sourceCommit": "0123456789abcdef0123456789abcdef01234567",
+  "screenshots": ["screenshot1.png"]
 }
 ```
 
@@ -61,11 +57,12 @@ Your `manifest.json` must conform to [`app-manifest.schema.json`](app-manifest.s
 The CI pipeline will automatically:
 
 - Validate your `manifest.json` against the JSON Schema
-- Check semver format for your version
-- Verify `architecture` is `windows_all`
+- Verify that `sha256` matches the submitted `.nipkg`
+- Inspect the `.nipkg` archive structure
+- Extract package metadata from the `.nipkg` control file
 - Check for duplicate package names
 - Verify `.nipkg` file size is ≤ 100 MB
-- Validate required fields are present
+- Validate that the package contains the required Plugin Manager metadata
 
 ### 5. Maintainer review
 
@@ -81,7 +78,7 @@ A maintainer will:
 After merge, CI will:
 
 1. Attach your `.nipkg` to a GitHub Release
-2. Base64-encode your icon and screenshots
+2. Reuse the icon embedded in the `.nipkg` and base64-encode any submitted screenshots
 3. Regenerate the `Packages` index
 4. Deploy to GitHub Pages
 
@@ -91,16 +88,15 @@ Your plugin will be available in the Plugin Manager the next time users refresh 
 
 | Requirement     | Details                                                                                |
 | --------------- | -------------------------------------------------------------------------------------- |
-| Metadata        | All required `manifest.json` fields must be present (see schema)                       |
-| Plugin metadata | Must include `section`, `xbPlugin`, `license`, and `maintainer`                        |
+| Manifest        | `manifest.json` must contain `schemaVersion`, `nipkgFile`, and the correct `sha256`    |
+| Package metadata | The `.nipkg` must contain `Section`, `XB-Plugin`, `Maintainer`, `XB-SlPluginManagerLicense`, `XB-DisplayName`, and `XB-SlPluginManagerIcon` |
 | Content         | `.nipkg` must contain a valid webapp (`index.html` at root) or notebook (`.ipynb`)     |
 | CSP             | No external network calls outside SystemLink's own APIs                                |
-| Icon            | SVG or PNG, max 128×128 px (required)                                                  |
+| Icon            | Must be embedded in the `.nipkg` as `XB-SlPluginManagerIcon`                           |
 | Description     | ≥ 20 characters                                                                        |
-| License         | Must be specified (SPDX identifier or "Proprietary")                                   |
+| License         | Must be embedded in the package metadata (SPDX identifier or "Proprietary")            |
 | Checksums       | SHA256 must match `.nipkg` contents                                                    |
 | Version         | Valid semver (`MAJOR.MINOR.PATCH`)                                                     |
-| Architecture    | Must be `windows_all`                                                                  |
 | Size            | ≤ 100 MB                                                                               |
 | Naming          | Package name is first-come-first-served — CI rejects duplicates from different authors |
 
@@ -124,8 +120,8 @@ Alternatively, you can manually create a `.nipkg` using NI Package Manager tools
 
 To release a new version:
 
-1. Update the `version` field in your `manifest.json`
-2. Replace the `.nipkg` file with the new version
+1. Build a new `.nipkg`
+2. Recompute the `sha256` in your thin `manifest.json`
 3. Submit a new Pull Request
 
 ---
@@ -153,7 +149,7 @@ Source repo (your webapps)              systemlink-plugin-manager
 
 1. **Create a PAT** (classic) with `repo` scope that has access to the `systemlink-plugin-manager` repository. Store it as a secret named `PLUGIN_MANAGER_DISPATCH_TOKEN` in your source repository.
 
-2. **Add a `manifest.json`** next to each webapp project in your source repo. It must conform to [`app-manifest.schema.json`](app-manifest.schema.json).
+2. **Generate a thin submission manifest** during your release workflow after packaging the `.nipkg`. It must conform to [`app-manifest.schema.json`](app-manifest.schema.json).
 
 3. **Add the publish workflow** to your source repository. See [`.github/examples/publish-to-plugin-manager.yml`](.github/examples/publish-to-plugin-manager.yml) for a complete, ready-to-use example with a 5-app matrix build.
 
@@ -165,7 +161,7 @@ You can also use the `submit_package.py` script directly:
 # From a clone of systemlink-plugin-manager
 python scripts/submit_package.py \
     --manifest path/to/manifest.json \
-    --nipkg path/to/my-app_1.0.0_windows_all.nipkg
+  --nipkg path/to/my-app_1.0.0_all.nipkg
 
 # This creates a local branch submit/my-app-v1.0.0
 # Push and open a PR:
@@ -176,10 +172,10 @@ Or download from a GitHub Release:
 
 ```bash
 python scripts/submit_package.py \
-    --manifest-json '{"package":"my-app","version":"1.0.0",...}' \
+  --manifest-json '{"schemaVersion":2,"nipkgFile":"my-app_1.0.0_all.nipkg","sha256":"..."}' \
     --source-repo yourorg/your-repo \
     --release-tag my-app-v1.0.0 \
-    --artifact-name my-app_1.0.0_windows_all.nipkg \
+  --artifact-name my-app_1.0.0_all.nipkg \
     --create-pr
 ```
 

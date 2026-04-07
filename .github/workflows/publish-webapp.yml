@@ -42,13 +42,9 @@ jobs:
           echo "tag=systemlink-plugin-manager-v${VERSION}" >> "$GITHUB_OUTPUT"
           echo "📦 Version: $VERSION"
 
-      - name: Sync version to manifest, nipkg config, and models
+      - name: Sync version to nipkg config and models
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-
-          jq --arg v "$VERSION" '.version = $v' \
-            submissions/systemlink-plugin-manager/manifest.json > tmp.json \
-            && mv tmp.json submissions/systemlink-plugin-manager/manifest.json
 
           jq --arg v "$VERSION" '.version = $v' \
             webapp/nipkg.config.json > tmp.json \
@@ -62,7 +58,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add webapp/package.json webapp/CHANGELOG.md \
-                  submissions/systemlink-plugin-manager/manifest.json webapp/nipkg.config.json \
+                  webapp/nipkg.config.json \
                   webapp/src/app/models/plugin-manager.models.ts \
                   change/
           if git diff --cached --quiet; then
@@ -90,7 +86,7 @@ jobs:
         id: package
         run: |
           rm -rf dist/nipkg
-          npx -y @ni-kismet/sl-webapp-nipkg@1.0.0 build \
+          npx -y @ni-kismet/sl-webapp-nipkg@1.1.0 build \
             --config nipkg.config.json \
             --output-dir dist/nipkg
           NIPKG=$(find dist/nipkg -maxdepth 1 -name '*.nipkg' | head -1)
@@ -102,6 +98,40 @@ jobs:
           echo "path=webapp/$NIPKG" >> "$GITHUB_OUTPUT"
           echo "name=$(basename "$NIPKG")" >> "$GITHUB_OUTPUT"
         working-directory: webapp
+
+      - name: Update thin submission manifest
+        run: |
+          NIPKG_PATH="${{ steps.package.outputs.path }}"
+          NIPKG_NAME="${{ steps.package.outputs.name }}"
+          SHA256=$(shasum -a 256 "$NIPKG_PATH" | awk '{print $1}')
+          SOURCE_COMMIT=$(git rev-parse HEAD)
+
+          jq -n \
+            --arg nipkgFile "$NIPKG_NAME" \
+            --arg sha256 "$SHA256" \
+            --arg sourceRepo "ni-kismet/systemlink-plugin-manager" \
+            --arg releaseTag "${{ steps.version.outputs.tag }}" \
+            --arg sourceCommit "$SOURCE_COMMIT" \
+            '{
+              schemaVersion: 2,
+              nipkgFile: $nipkgFile,
+              sha256: $sha256,
+              sourceRepo: $sourceRepo,
+              releaseTag: $releaseTag,
+              sourceCommit: $sourceCommit
+            }' > submissions/systemlink-plugin-manager/manifest.json
+
+      - name: Commit submission manifest
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add submissions/systemlink-plugin-manager/manifest.json
+          if git diff --cached --quiet; then
+            echo "Manifest already up to date."
+          else
+            git commit -m "chore: update submission manifest for ${{ steps.version.outputs.version }} [skip ci]"
+            git push
+          fi
 
       - name: Create or update GitHub Release
         env:

@@ -1,13 +1,7 @@
 {
-  "package": "systemlink-plugin-manager",
-  "version": "0.2.2",
-  "displayName": "Plugin Manager for SystemLink",
-  "description": "A curated plugin manager for discovering, installing, upgrading, and removing SystemLink extensions from replicated package feeds.",
-  "section": "Administration",
-  "maintainer": "NI Plugin Manager <appstore@ni.com>",
-  "homepage": "https://github.com/ni-kismet/systemlink-plugin-manager",
-  "license": "MIT",
-  "xbPlugin": "webapp",
-  "slPluginManagerTags": "plugin-manager,catalog,packages,systemlink,webapp",
-  "slPluginManagerMinServerVersion": "2024 Q4"
+  "schemaVersion": 2,
+  "nipkgFile": "systemlink-plugin-manager_0.2.2_all.nipkg",
+  "sha256": "50914b2135bacc12a9cf8213c231d2bf4a612371fe671646bee74f7bda24e5f9",
+  "sourceRepo": "ni-kismet/systemlink-plugin-manager",
+  "releaseTag": "systemlink-plugin-manager-v0.2.2"
 }

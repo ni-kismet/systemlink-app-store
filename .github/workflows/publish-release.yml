@@ -64,49 +64,30 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Read manifest
-        id: manifest
+      - name: Locate release artifact
+        id: artifact
         run: |
           DIR="submissions/${SUBMISSION_NAME}"
           if [ ! -f "$DIR/manifest.json" ]; then
             echo "✗ No manifest.json found in $DIR" >&2
             exit 1
           fi
-          PACKAGE=$(jq -r '.package' "$DIR/manifest.json")
-          VERSION=$(jq -r '.version' "$DIR/manifest.json")
-          DISPLAY_NAME=$(jq -r '.displayName' "$DIR/manifest.json")
-          echo "package=$PACKAGE" >> "$GITHUB_OUTPUT"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "display_name=$DISPLAY_NAME" >> "$GITHUB_OUTPUT"
-          echo "tag=${PACKAGE}-v${VERSION}" >> "$GITHUB_OUTPUT"
 
-      - name: Locate release artifact
-        id: artifact
-        run: |
-          DIR="submissions/${SUBMISSION_NAME}"
-          EXPLICIT=$(jq -r '.nipkgFile // empty' "$DIR/manifest.json")
+          EXPLICIT=$(jq -r '.nipkgFile' "$DIR/manifest.json")
           FOUND=""
 
           if [ -n "$EXPLICIT" ] && [ -f "$DIR/$EXPLICIT" ]; then
             FOUND="$DIR/$EXPLICIT"
-          elif [ -z "$EXPLICIT" ]; then
-            shopt -s nullglob
-            MATCHES=("$DIR"/*.nipkg)
-            shopt -u nullglob
-            if [ "${#MATCHES[@]}" -eq 1 ]; then
-              FOUND="${MATCHES[0]}"
-            fi
           fi
 
-          PACKAGE_NAME="${{ steps.manifest.outputs.package }}"
           if [ -n "$FOUND" ]; then
             echo "build_webapp=false" >> "$GITHUB_OUTPUT"
             echo "path=$FOUND" >> "$GITHUB_OUTPUT"
             echo "name=$(basename "$FOUND")" >> "$GITHUB_OUTPUT"
-          elif [ "$PACKAGE_NAME" = "systemlink-plugin-manager" ]; then
+          elif [ "$SUBMISSION_NAME" = "systemlink-plugin-manager" ]; then
             echo "build_webapp=true" >> "$GITHUB_OUTPUT"
           else
-            echo "✗ No .nipkg artifact found in $DIR. Add one to the submission or set nipkgFile." >&2
+            echo "✗ No .nipkg artifact found in $DIR for manifest nipkgFile=$EXPLICIT" >&2
             exit 1
           fi
 
@@ -132,7 +113,7 @@ jobs:
         id: build_nipkg
         run: |
           rm -rf dist/nipkg
-          npx -y @ni-kismet/sl-webapp-nipkg@1.0.0 build \
+          npx -y @ni-kismet/sl-webapp-nipkg@1.1.0 build \
             --config nipkg.config.json \
             --output-dir dist/nipkg
           NIPKG=$(find dist/nipkg -maxdepth 1 -name '*.nipkg' | head -1)
@@ -156,19 +137,39 @@ jobs:
             echo "name=${{ steps.artifact.outputs.name }}" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Read package metadata
+        id: package_metadata
+        run: |
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          from pathlib import Path
+          import sys
+
+          sys.path.insert(0, str(Path('scripts').resolve()))
+          from submission_utils import extract_control_fields, metadata_from_control_fields
+
+          artifact = Path("${{ steps.release_artifact.outputs.path }}")
+          control_fields = extract_control_fields(artifact)
+          metadata = metadata_from_control_fields(control_fields)
+
+          print(f"package={metadata['package']}")
+          print(f"version={metadata['version']}")
+          print(f"display_name={metadata['displayName']}")
+          print(f"tag={metadata['package']}-v{metadata['version']}")
+          PY
+
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if gh release view "${{ steps.manifest.outputs.tag }}" >/dev/null 2>&1; then
-            gh release upload "${{ steps.manifest.outputs.tag }}" \
+          if gh release view "${{ steps.package_metadata.outputs.tag }}" >/dev/null 2>&1; then
+            gh release upload "${{ steps.package_metadata.outputs.tag }}" \
               "${{ steps.release_artifact.outputs.path }}" \
               --clobber
           else
-            gh release create "${{ steps.manifest.outputs.tag }}" \
+            gh release create "${{ steps.package_metadata.outputs.tag }}" \
               "${{ steps.release_artifact.outputs.path }}" \
-              --title "${{ steps.manifest.outputs.display_name }} v${{ steps.manifest.outputs.version }}" \
-              --notes "Release of ${{ steps.manifest.outputs.display_name }} version ${{ steps.manifest.outputs.version }}" \
+              --title "${{ steps.package_metadata.outputs.display_name }} v${{ steps.package_metadata.outputs.version }}" \
+              --notes "Release of ${{ steps.package_metadata.outputs.display_name }} version ${{ steps.package_metadata.outputs.version }}" \
               --latest=false
           fi
 
