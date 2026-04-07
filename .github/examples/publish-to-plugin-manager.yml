@@ -94,6 +94,27 @@ jobs:
           echo "path=$NIPKG_PATH" >> "$GITHUB_OUTPUT"
           echo "name=$(basename "$NIPKG_PATH")" >> "$GITHUB_OUTPUT"
 
+      - name: Build thin submission manifest
+        id: submission_manifest
+        working-directory: ${{ matrix.app.path }}
+        run: |
+          SHA256=$(shasum -a 256 "${{ steps.package.outputs.path }}" | awk '{print $1}')
+          SOURCE_COMMIT=$(git rev-parse HEAD)
+          jq -n \
+            --arg nipkgFile "${{ steps.package.outputs.name }}" \
+            --arg sha256 "$SHA256" \
+            --arg sourceRepo "${{ github.repository }}" \
+            --arg releaseTag "${{ steps.manifest.outputs.tag }}" \
+            --arg sourceCommit "$SOURCE_COMMIT" \
+            '{
+              schemaVersion: 2,
+              nipkgFile: $nipkgFile,
+              sha256: $sha256,
+              sourceRepo: $sourceRepo,
+              releaseTag: $releaseTag,
+              sourceCommit: $sourceCommit
+            }' > submission-manifest.json
+
       # Attach .nipkg to a GitHub Release in this repository
       - name: Create release
         env:
@@ -122,10 +143,7 @@ jobs:
           PLUGIN_MANAGER_TOKEN: ${{ secrets.PLUGIN_MANAGER_DISPATCH_TOKEN }}
         working-directory: ${{ matrix.app.path }}
         run: |
-          MANIFEST=$(cat manifest.json)
-          ICON_FILE=""
-          [ -f icon.svg ] && ICON_FILE="icon.svg"
-          [ -f icon.png ] && ICON_FILE="icon.png"
+          MANIFEST=$(cat submission-manifest.json)
 
           curl -fsSL \
             -X POST \
@@ -139,15 +157,13 @@ jobs:
               --arg source_repo "${{ github.repository }}" \
               --arg release_tag "${{ steps.manifest.outputs.tag }}" \
               --arg artifact_name "${{ steps.package.outputs.name }}" \
-              --arg icon_url "$ICON_FILE" \
               '{
                 event_type: $event_type,
                 client_payload: {
                   manifest: $manifest,
                   source_repo: $source_repo,
                   release_tag: $release_tag,
-                  artifact_name: $artifact_name,
-                  icon_url: $icon_url
+                  artifact_name: $artifact_name
                 }
               }'
             )"

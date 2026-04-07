@@ -91,18 +91,20 @@ jobs:
 
           submission_dir = Path(sys.argv[1])
           manifest = json.loads((submission_dir / 'manifest.json').read_text())
-          explicit = manifest.get('nipkgFile')
-          if explicit:
-              candidate = submission_dir / explicit
-              print(candidate if candidate.is_file() else '')
-          else:
-              matches = sorted(submission_dir.glob('*.nipkg'))
-              print(matches[0] if len(matches) == 1 else '')
+          candidate = submission_dir / manifest['nipkgFile']
+          print(candidate if candidate.is_file() else '')
           PY
             )
 
             if [ -z "$NIPKG" ] || [ ! -f "$NIPKG" ]; then
-              echo "✗ $dir must include exactly one .nipkg artifact (or a valid nipkgFile entry)" >&2
+              echo "✗ $dir must include the .nipkg referenced by manifest.json" >&2
+              exit 1
+            fi
+
+            EXPECTED_SHA=$(jq -r '.sha256' "$dir/manifest.json")
+            ACTUAL_SHA=$(shasum -a 256 "$NIPKG" | awk '{print $1}')
+            if [ "$EXPECTED_SHA" != "$ACTUAL_SHA" ]; then
+              echo "✗ $NIPKG sha256 does not match manifest.json" >&2
               exit 1
             fi
 
@@ -140,20 +142,3 @@ jobs:
             done
           done
 
-      - name: Check for duplicate package names
-        run: |
-          python -c "
-          import json, sys
-          from pathlib import Path
-
-          seen = {}
-          for manifest_path in sorted(Path('submissions').glob('*/manifest.json')):
-              manifest = json.loads(manifest_path.read_text())
-              pkg = manifest.get('package', '')
-              d = manifest_path.parent.name
-              if pkg in seen:
-                  print(f'✗ Duplicate package name \"{pkg}\" in {d} and {seen[pkg]}', file=sys.stderr)
-                  sys.exit(1)
-              seen[pkg] = d
-          print(f'✓ No duplicate package names ({len(seen)} unique)')
-          "
