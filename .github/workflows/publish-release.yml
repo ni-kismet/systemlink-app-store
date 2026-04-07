@@ -74,6 +74,8 @@ jobs:
           fi
 
           EXPLICIT=$(jq -r '.nipkgFile' "$DIR/manifest.json")
+          SOURCE_REPO=$(jq -r '.sourceRepo // empty' "$DIR/manifest.json")
+          RELEASE_TAG=$(jq -r '.releaseTag // empty' "$DIR/manifest.json")
           FOUND=""
 
           if [ -n "$EXPLICIT" ] && [ -f "$DIR/$EXPLICIT" ]; then
@@ -86,10 +88,33 @@ jobs:
             echo "name=$(basename "$FOUND")" >> "$GITHUB_OUTPUT"
           elif [ "$SUBMISSION_NAME" = "systemlink-plugin-manager" ]; then
             echo "build_webapp=true" >> "$GITHUB_OUTPUT"
+          elif [ -n "$SOURCE_REPO" ] && [ -n "$RELEASE_TAG" ]; then
+            [[ "$SOURCE_REPO" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]] || { echo "✗ Invalid sourceRepo: $SOURCE_REPO" >&2; exit 1; }
+            [[ "$RELEASE_TAG" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "✗ Invalid releaseTag: $RELEASE_TAG" >&2; exit 1; }
+            [[ "$EXPLICIT" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*\.nipkg$ ]] || { echo "✗ Invalid nipkgFile: $EXPLICIT" >&2; exit 1; }
+            echo "download_remote=true" >> "$GITHUB_OUTPUT"
+            echo "source_repo=$SOURCE_REPO" >> "$GITHUB_OUTPUT"
+            echo "release_tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+            echo "name=$EXPLICIT" >> "$GITHUB_OUTPUT"
           else
             echo "✗ No .nipkg artifact found in $DIR for manifest nipkgFile=$EXPLICIT" >&2
             exit 1
           fi
+
+      - name: Download submission artifact from source release
+        if: steps.artifact.outputs.download_remote == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          DEST_DIR="downloaded-artifacts/${SUBMISSION_NAME}"
+          mkdir -p "$DEST_DIR"
+          gh release download "${{ steps.artifact.outputs.release_tag }}" \
+            --repo "${{ steps.artifact.outputs.source_repo }}" \
+            --pattern "${{ steps.artifact.outputs.name }}" \
+            --dir "$DEST_DIR"
+          echo "path=$DEST_DIR/${{ steps.artifact.outputs.name }}" >> "$GITHUB_OUTPUT"
+          echo "name=${{ steps.artifact.outputs.name }}" >> "$GITHUB_OUTPUT"
+        id: download_artifact
 
       - uses: actions/setup-node@v4
         if: steps.artifact.outputs.build_webapp == 'true'
@@ -132,9 +157,21 @@ jobs:
           if [ "${{ steps.artifact.outputs.build_webapp }}" = "true" ]; then
             echo "path=${{ steps.build_nipkg.outputs.path }}" >> "$GITHUB_OUTPUT"
             echo "name=${{ steps.build_nipkg.outputs.name }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ steps.artifact.outputs.download_remote }}" = "true" ]; then
+            echo "path=${{ steps.download_artifact.outputs.path }}" >> "$GITHUB_OUTPUT"
+            echo "name=${{ steps.download_artifact.outputs.name }}" >> "$GITHUB_OUTPUT"
           else
             echo "path=${{ steps.artifact.outputs.path }}" >> "$GITHUB_OUTPUT"
             echo "name=${{ steps.artifact.outputs.name }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Verify release artifact hash
+        run: |
+          EXPECTED_SHA=$(jq -r '.sha256' "submissions/${SUBMISSION_NAME}/manifest.json")
+          ACTUAL_SHA=$(shasum -a 256 "${{ steps.release_artifact.outputs.path }}" | awk '{print $1}')
+          if [ "$EXPECTED_SHA" != "$ACTUAL_SHA" ]; then
+            echo "✗ Release artifact sha256 does not match manifest.json" >&2
+            exit 1
           fi
 
       - name: Read package metadata

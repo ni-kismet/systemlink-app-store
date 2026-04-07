@@ -9,21 +9,19 @@ import gzip
 import json
 import mimetypes
 import os
-import shutil
 import sys
-import tempfile
 import urllib.error
-import urllib.request
 from pathlib import Path
 
 from submission_utils import (
-    THIN_MANIFEST_SCHEMA_VERSION,
     extract_control_fields,
-    find_nipkg,
     md5_file,
     metadata_from_control_fields,
+    resolve_submission_nipkg,
     sha256_file,
+    validate_nipkg_archive,
     validate_package_metadata,
+    validate_submission_manifest,
 )
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -40,16 +38,6 @@ def base64_encode_file(path: Path) -> str:
     with open(path, "rb") as stream:
         encoded = base64.b64encode(stream.read()).decode("ascii")
     return f"data:{mime};base64,{encoded}"
-
-
-def download_file(url: str, dest: Path) -> None:
-    request = urllib.request.Request(
-        url,
-        headers={"User-Agent": "systemlink-plugin-manager-index-builder"},
-    )
-    with urllib.request.urlopen(request, timeout=120) as response:
-        with open(dest, "wb") as stream:
-            shutil.copyfileobj(response, stream)
 
 
 def get_repo_url(args_repo_url: str | None) -> str:
@@ -69,44 +57,7 @@ def load_manifest(manifest_path: Path) -> dict:
 
 
 def validate_manifest(manifest: dict, submission_dir: Path) -> list[str]:
-    errors: list[str] = []
-    name = submission_dir.name
-
-    if manifest.get("schemaVersion") != THIN_MANIFEST_SCHEMA_VERSION:
-        errors.append(f"[{name}] schemaVersion must be {THIN_MANIFEST_SCHEMA_VERSION}")
-
-    if not manifest.get("nipkgFile"):
-        errors.append(f"[{name}] Missing required field: nipkgFile")
-
-    if not manifest.get("sha256"):
-        errors.append(f"[{name}] Missing required field: sha256")
-
-    screenshots = manifest.get("screenshots", [])
-    if len(screenshots) > MAX_SCREENSHOTS:
-        errors.append(f"[{name}] screenshots may contain at most {MAX_SCREENSHOTS} items")
-
-    for screenshot in screenshots:
-        screenshot_path = submission_dir / screenshot
-        if not screenshot_path.is_file():
-            errors.append(f"[{name}] screenshot does not exist: {screenshot!r}")
-
-    return errors
-
-
-def resolve_nipkg_path(submission_dir: Path, manifest: dict, repo_url: str) -> Path | None:
-    local_path = find_nipkg(submission_dir, manifest)
-    if local_path is not None:
-        return local_path
-
-    release_tag = manifest.get("releaseTag")
-    nipkg_file = manifest.get("nipkgFile")
-    if not release_tag or not nipkg_file:
-        return None
-
-    downloaded_path = Path(tempfile.mkdtemp(prefix="rebuild-index-")) / nipkg_file
-    artifact_url = f"{repo_url}/releases/download/{release_tag}/{nipkg_file}"
-    download_file(artifact_url, downloaded_path)
-    return downloaded_path
+    return validate_submission_manifest(manifest, submission_dir)
 
 
 def load_submission(
@@ -125,7 +76,11 @@ def load_submission(
         return manifest, {}, None, errors
 
     try:
-        nipkg_path = resolve_nipkg_path(submission_dir, manifest, repo_url)
+        nipkg_path = resolve_submission_nipkg(
+            submission_dir,
+            manifest,
+            user_agent="systemlink-plugin-manager-index-builder",
+        )
         if nipkg_path is None or not nipkg_path.is_file():
             errors.append(
                 f"[{submission_dir.name}] Could not resolve .nipkg artifact {manifest.get('nipkgFile', '')!r}"
@@ -135,6 +90,10 @@ def load_submission(
         actual_sha256 = sha256_file(nipkg_path)
         if actual_sha256 != manifest["sha256"]:
             errors.append(f"[{submission_dir.name}] sha256 does not match the submitted .nipkg")
+            return manifest, {}, None, errors
+
+        errors.extend(validate_nipkg_archive(nipkg_path, submission_dir.name))
+        if errors:
             return manifest, {}, None, errors
 
         control_fields = extract_control_fields(nipkg_path)
@@ -147,7 +106,7 @@ def load_submission(
             )
         )
         return manifest, metadata, nipkg_path, errors
-    except (RuntimeError, urllib.error.URLError) as exc:
+    except (RuntimeError, urllib.error.URLError, ValueError) as exc:
         errors.append(f"[{submission_dir.name}] {exc}")
         return manifest, {}, None, errors
 

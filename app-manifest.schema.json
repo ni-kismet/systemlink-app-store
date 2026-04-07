@@ -17,8 +17,8 @@
     },
     "nipkgFile": {
       "type": "string",
-      "pattern": ".+\\.nipkg$",
-      "description": "Filename of the reviewed .nipkg artifact stored in this submission directory."
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*\\.nipkg$",
+      "description": "Filename of the reviewed .nipkg artifact. It may be stored in this submission directory or resolved from sourceRepo/releaseTag during validation."
     },
     "sha256": {
       "type": "string",
@@ -52,5 +52,31 @@
       "uniqueItems": true
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "sourceRepo"
+        ]
+      },
+      "then": {
+        "required": [
+          "releaseTag"
+        ]
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "releaseTag"
+        ]
+      },
+      "then": {
+        "required": [
+          "sourceRepo"
+        ]
+      }
+    }
+  ],
   "additionalProperties": false
 }
