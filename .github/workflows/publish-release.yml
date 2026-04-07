@@ -36,7 +36,7 @@ jobs:
           AFTER_SHA: ${{ github.event.after }}
         run: |
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
-            SUBMISSIONS=$(echo "$INPUT_SUBMISSION" | jq -R -s -c '[.]')
+            SUBMISSIONS=$(jq -n -c --arg submission "$INPUT_SUBMISSION" '[ $submission ]')
           else
             # Detect submission directories changed in this push.
             # Exclude systemlink-plugin-manager (published by publish-webapp pipeline).
