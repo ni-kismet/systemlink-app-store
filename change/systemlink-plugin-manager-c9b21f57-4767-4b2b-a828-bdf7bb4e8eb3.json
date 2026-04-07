@@ -1,0 +1,7 @@
+{
+  "type": "major",
+  "comment": "Use thin submission manifests backed by .nipkg metadata",
+  "packageName": "systemlink-plugin-manager",
+  "email": "1458528+fredvisser@users.noreply.github.com",
+  "dependentChangeType": "patch"
+}
