@@ -24,11 +24,14 @@ import { createClient as createFeedsClient, createConfig as createFeedsConfig } 
 import {
   getNifeedV1Feeds,
   getNifeedV1FeedsByFeedIdPackages,
+  getNifeedV1FeedUpdatesByUpdateDescriptorListId,
+  getNifeedV1JobsByJobId,
   postNifeedV1ReplicateFeed,
+  postNifeedV1FeedsByFeedIdApplyUpdates,
   postNifeedV1FeedsByFeedIdCheckForUpdates,
   deleteNifeedV1FeedsByFeedId,
 } from '@ni/systemlink-clients-ts/feeds';
-import type { Package } from '@ni/systemlink-clients-ts/feeds';
+import type { ApplyUpdateDescriptor, Package } from '@ni/systemlink-clients-ts/feeds';
 import { createClient as createUserClient, createConfig as createUserConfig } from '@ni/systemlink-clients-ts/user/client';
 import { getWorkspaces } from '@ni/systemlink-clients-ts/user';
 import { createClient as createWebAppClient, createConfig as createWebAppConfig } from '@ni/systemlink-clients-ts/web-application/client';
@@ -64,6 +67,10 @@ const LEGACY_DASHBOARD_TAG = 'appstore';
 const LEGACY_DASHBOARD_TAG_PACKAGE_PREFIX = 'appstore-pkg-';
 const LEGACY_DASHBOARD_TAG_VERSION_PREFIX = 'appstore-ver-';
 const LEGACY_DASHBOARD_TAG_FEED_PREFIX = 'appstore-feed-';
+
+const FEED_JOB_POLL_ATTEMPTS = 60;
+const FEED_JOB_POLL_DELAY_MS = 2000;
+const MAX_APPLY_UPDATE_DESCRIPTORS = 1000;
 
 @Injectable({ providedIn: 'root' })
 export class PluginManagerService {
@@ -195,6 +202,25 @@ export class PluginManagerService {
     if (error) throw new Error(`Failed to delete feed: ${JSON.stringify(error)}`);
   }
 
+  private async waitForFeedJob(jobId: string, action: string): Promise<any> {
+    for (let attempt = 0; attempt < FEED_JOB_POLL_ATTEMPTS; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, FEED_JOB_POLL_DELAY_MS));
+      const { data, error } = await getNifeedV1JobsByJobId({
+        client: this.feedsClient,
+        path: { jobId },
+      });
+      if (error) continue;
+
+      const job = data as any;
+      if (job.status === 'SUCCESS') return job;
+      if (job.status === 'FAILED' || job.status === 'ERROR') {
+        throw new Error(`${action} job failed: ${JSON.stringify(job.error)}`);
+      }
+    }
+
+    throw new Error(`${action} job timed out`);
+  }
+
   /** Trigger a check-for-updates job and poll until it completes.
    * Returns the list of feed-update resource IDs found (may be empty). */
   async checkForUpdates(feedId: string): Promise<string[]> {
@@ -206,21 +232,8 @@ export class PluginManagerService {
     const jobId = (data as any)?.jobId as string | undefined;
     if (!jobId) return [];
 
-    // Poll the job directly until the CHECK_FEED_UPDATE job completes.
-    for (let attempt = 0; attempt < 30; attempt++) {
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      const jobRes = await fetch(
-        `${this.origin}/nifeed/v1/jobs/${encodeURIComponent(jobId)}`,
-        { credentials: 'include' },
-      );
-      if (!jobRes.ok) continue;
-      const job = await jobRes.json().catch(() => ({} as any));
-      if (job.status === 'SUCCESS') return job.result?.resourceIds ?? [];
-      if (job.status === 'FAILED' || job.status === 'ERROR') {
-        throw new Error(`check-for-updates job failed: ${JSON.stringify(job.error)}`);
-      }
-    }
-    throw new Error('check-for-updates job timed out');
+    const job = await this.waitForFeedJob(jobId, 'check-for-updates');
+    return job.result?.resourceIds ?? [];
   }
 
   /** Apply pending feed updates.
@@ -230,34 +243,41 @@ export class PluginManagerService {
   async applyUpdates(feedId: string, resourceIds: string[]): Promise<void> {
     if (resourceIds.length === 0) return;
 
-    // Gather update descriptors from all feed-update resources.
-    const allDescriptors: Array<{ packageName: string; version: string; packageUri: string }> = [];
+    // Collapse duplicate package URIs across update lists so we only enqueue each import once.
+    const descriptorsByUri = new Map<string, ApplyUpdateDescriptor>();
     for (const updateId of resourceIds) {
-      const res = await fetch(
-        `${this.origin}/nifeed/v1/feed-updates/${encodeURIComponent(updateId)}`,
-        { credentials: 'include' },
-      );
-      if (!res.ok) continue;
-      const update = await res.json().catch(() => ({} as any));
-      const descriptors = update.updateDescriptors ?? [];
-      allDescriptors.push(...descriptors);
+      const { data, error } = await getNifeedV1FeedUpdatesByUpdateDescriptorListId({
+        client: this.feedsClient,
+        path: { updateDescriptorListId: updateId },
+      });
+      if (error) continue;
+
+      const descriptors = (data as any)?.updateDescriptors ?? [];
+      for (const descriptor of descriptors) {
+        const packageUri = descriptor?.packageUri?.trim();
+        if (!packageUri || descriptorsByUri.has(packageUri)) continue;
+        descriptorsByUri.set(packageUri, { packageUri });
+      }
     }
 
+    const allDescriptors = Array.from(descriptorsByUri.values());
     if (allDescriptors.length === 0) return;
 
-    // apply-updates with the upstream package URIs.
-    const applyRes = await fetch(
-      `${this.origin}/nifeed/v1/feeds/${encodeURIComponent(feedId)}/apply-updates?ignoreImportErrors=true`,
-      {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ updateDescriptors: allDescriptors }),
-      },
-    );
-    if (!applyRes.ok) {
-      const err = await applyRes.json().catch(() => ({}));
-      throw new Error(`Failed to apply updates: ${JSON.stringify(err)}`);
+    for (let start = 0; start < allDescriptors.length; start += MAX_APPLY_UPDATE_DESCRIPTORS) {
+      const batch = allDescriptors.slice(start, start + MAX_APPLY_UPDATE_DESCRIPTORS);
+      const { data, error } = await postNifeedV1FeedsByFeedIdApplyUpdates({
+        client: this.feedsClient,
+        path: { feedId },
+        query: { ignoreImportErrors: true },
+        body: { applyUpdateDescriptors: batch },
+      });
+      if (error) throw new Error(`Failed to apply updates: ${JSON.stringify(error)}`);
+
+      const jobId = (data as any)?.jobId as string | undefined;
+      if (!jobId) throw new Error('Failed to apply updates: missing job ID');
+
+      const batchNumber = Math.floor(start / MAX_APPLY_UPDATE_DESCRIPTORS) + 1;
+      await this.waitForFeedJob(jobId, `apply-updates batch ${batchNumber}`);
     }
   }
 
