@@ -6,15 +6,15 @@ from __future__ import annotations
 import argparse
 import importlib
 import json
-import re
 import shutil
 import subprocess
 import sys
 import tempfile
-import urllib.request
 from pathlib import Path
 
 from submission_utils import (
+    build_github_release_asset_url,
+    download_file,
     extract_control_fields,
     metadata_from_control_fields,
     sha256_file,
@@ -24,12 +24,6 @@ from submission_utils import (
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SUBMISSIONS_DIR = REPO_ROOT / "submissions"
 SCHEMA_PATH = REPO_ROOT / "app-manifest.schema.json"
-
-ALLOWED_DOWNLOAD_PATTERN = re.compile(
-    r"^https://github\.com/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+/"
-    r"releases/download/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+\.nipkg$"
-)
-GITHUB_REPO_PATTERN = re.compile(r"^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$")
 
 
 def validate_manifest(manifest: dict) -> list[str]:
@@ -47,32 +41,9 @@ def validate_manifest(manifest: dict) -> list[str]:
     return [error.message for error in validator.iter_errors(manifest)]
 
 
-def safe_download_url(source_repo: str, release_tag: str, filename: str) -> str:
-    if not GITHUB_REPO_PATTERN.match(source_repo):
-        raise ValueError(f"Invalid source_repo format: {source_repo!r}")
-
-    for component in [release_tag, filename]:
-        if not re.match(r"^[A-Za-z0-9._-]+$", component):
-            raise ValueError(f"Invalid characters in: {component!r}")
-
-    url = (
-        f"https://github.com/{source_repo}/releases/download/"
-        f"{release_tag}/{filename}"
-    )
-    if not ALLOWED_DOWNLOAD_PATTERN.match(url):
-        raise ValueError(f"URL does not match allowed pattern: {url}")
-    return url
-
-
-def download_file(url: str, dest: Path) -> None:
+def download_submission_file(url: str, dest: Path) -> None:
     print(f"Downloading {url} -> {dest}")
-    request = urllib.request.Request(
-        url,
-        headers={"User-Agent": "systemlink-plugin-manager-submit"},
-    )
-    with urllib.request.urlopen(request, timeout=120) as response:
-        with open(dest, "wb") as stream:
-            shutil.copyfileobj(response, stream)
+    download_file(url, dest, user_agent="systemlink-plugin-manager-submit")
     print(f"  Downloaded {dest.stat().st_size} bytes")
 
 
@@ -98,8 +69,8 @@ def resolve_nipkg(
     if source_repo and release_tag and artifact_name:
         temp_dir = Path(tempfile.mkdtemp(prefix="submit-package-"))
         downloaded_path = temp_dir / artifact_name
-        url = safe_download_url(source_repo, release_tag, artifact_name)
-        download_file(url, downloaded_path)
+        url = build_github_release_asset_url(source_repo, release_tag, artifact_name)
+        download_submission_file(url, downloaded_path)
         return downloaded_path
 
     raise ValueError(

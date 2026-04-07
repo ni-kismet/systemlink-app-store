@@ -4,12 +4,13 @@ Thank you for your interest in contributing to Plugin Manager for SystemLink. Th
 
 ## Overview
 
-The Plugin Manager uses a **curated, PR-based submission process** inspired by Homebrew. You submit a Pull Request containing your plugin metadata and `.nipkg` package, and maintainers review it before it becomes available in the catalog.
+The Plugin Manager uses a **curated, PR-based submission process** inspired by Homebrew. You submit a Pull Request containing your plugin metadata plus either the reviewed `.nipkg` itself or immutable GitHub release coordinates for that reviewed `.nipkg`, and maintainers review it before it becomes available in the catalog.
 
 ## Prerequisites
 
 - A built SystemLink webapp (Angular, WebVI, or other — must produce an `index.html` at the root)
 - The webapp packaged as a `.nipkg` file (see [Packaging your app](#packaging-your-app))
+- Either the `.nipkg` stored in your submission directory or a GitHub release containing that exact `.nipkg`
 - Package metadata embedded in the `.nipkg` control file, including `XB-DisplayName`, `XB-Plugin`, `XB-SlPluginManagerLicense`, and `XB-SlPluginManagerIcon`
 - Optionally, up to 3 screenshots (PNG, max 800×600 px) stored next to the submission manifest
 
@@ -27,9 +28,11 @@ submissions/my-awesome-dashboard/
 └── my-awesome-dashboard_1.0.0_all.nipkg
 ```
 
+If you already publish immutable release assets from another GitHub repository, you can omit the local `.nipkg` file and instead provide `sourceRepo` and `releaseTag` in the manifest. CI will download and validate the reviewed artifact from that release.
+
 ### 2. Write your `manifest.json`
 
-Your `manifest.json` must conform to [`app-manifest.schema.json`](app-manifest.schema.json). It no longer duplicates package metadata. CI derives package name, version, display name, description, maintainer, license, plugin type, and icon directly from the submitted `.nipkg`.
+Your `manifest.json` must conform to [`app-manifest.schema.json`](app-manifest.schema.json). It no longer duplicates package metadata. CI derives package name, version, display name, description, maintainer, license, plugin type, and icon directly from the reviewed `.nipkg`, whether that package is committed in the PR or resolved from the referenced GitHub release.
 
 Minimal example:
 
@@ -57,7 +60,8 @@ Minimal example:
 The CI pipeline will automatically:
 
 - Validate your `manifest.json` against the JSON Schema
-- Verify that `sha256` matches the submitted `.nipkg`
+- Resolve the reviewed `.nipkg` from the submission directory or the referenced GitHub release
+- Verify that `sha256` matches the reviewed `.nipkg`
 - Inspect the `.nipkg` archive structure
 - Extract package metadata from the `.nipkg` control file
 - Check for duplicate package names
@@ -77,7 +81,7 @@ A maintainer will:
 
 After merge, CI will:
 
-1. Attach your `.nipkg` to a GitHub Release
+1. Attach the reviewed `.nipkg` to a GitHub Release in this repository
 2. Reuse the icon embedded in the `.nipkg` and base64-encode any submitted screenshots
 3. Regenerate the `Packages` index
 4. Deploy to GitHub Pages
@@ -89,6 +93,7 @@ Your plugin will be available in the Plugin Manager the next time users refresh 
 | Requirement     | Details                                                                                |
 | --------------- | -------------------------------------------------------------------------------------- |
 | Manifest        | `manifest.json` must contain `schemaVersion`, `nipkgFile`, and the correct `sha256`    |
+| Artifact source | Provide the `.nipkg` in the submission directory or provide both `sourceRepo` and `releaseTag` for a GitHub release asset matching `nipkgFile` |
 | Package metadata | The `.nipkg` must contain `Section`, `XB-Plugin`, `Maintainer`, `XB-SlPluginManagerLicense`, `XB-DisplayName`, and `XB-SlPluginManagerIcon` |
 | Content         | `.nipkg` must contain a valid webapp (`index.html` at root) or notebook (`.ipynb`)     |
 | CSP             | No external network calls outside SystemLink's own APIs                                |

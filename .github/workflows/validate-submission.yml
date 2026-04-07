@@ -76,69 +76,98 @@ jobs:
           print('All manifests valid.')
           "
 
-      - name: Validate .nipkg artifacts
+      - name: Validate resolved .nipkg artifacts
         env:
           CHANGED_DIRS: ${{ steps.changed.outputs.dirs }}
         run: |
-          set -euo pipefail
-          while IFS= read -r dir; do
-            [ -z "$dir" ] && continue
-
-            NIPKG=$(python - "$dir" <<'PY'
+          python - <<'PY'
           import json
+          import os
           import sys
           from pathlib import Path
 
-          submission_dir = Path(sys.argv[1])
-          manifest = json.loads((submission_dir / 'manifest.json').read_text())
-          candidate = submission_dir / manifest['nipkgFile']
-          print(candidate if candidate.is_file() else '')
+          sys.path.insert(0, str(Path('scripts').resolve()))
+          from submission_utils import (
+              MAX_NIPKG_SIZE_BYTES,
+              extract_control_fields,
+              find_nipkg,
+              metadata_from_control_fields,
+              resolve_submission_nipkg,
+              sha256_file,
+              validate_nipkg_archive,
+              validate_package_metadata,
+          )
+
+          dirs = os.environ.get('CHANGED_DIRS', '').strip().splitlines()
+          errors = []
+
+          for dir_name in dirs:
+              dir_name = dir_name.strip()
+              if not dir_name:
+                  continue
+
+              submission_dir = Path(dir_name)
+              manifest = json.loads((submission_dir / 'manifest.json').read_text())
+              local_nipkg = find_nipkg(submission_dir, manifest)
+
+              try:
+                  nipkg_path = resolve_submission_nipkg(
+                      submission_dir,
+                      manifest,
+                      user_agent='systemlink-plugin-manager-validate',
+                  )
+              except Exception as exc:
+                  errors.append(f'[{submission_dir.name}] {exc}')
+                  continue
+
+              if nipkg_path is None or not nipkg_path.is_file():
+                  errors.append(
+                      f'[{submission_dir.name}] Could not resolve .nipkg artifact {manifest.get("nipkgFile", "")!r}'
+                  )
+                  continue
+
+              actual_sha = sha256_file(nipkg_path)
+              if actual_sha != manifest['sha256']:
+                  errors.append(f'[{submission_dir.name}] sha256 does not match the submitted .nipkg')
+                  continue
+
+              archive_errors = validate_nipkg_archive(nipkg_path, submission_dir.name)
+              if archive_errors:
+                  errors.extend(archive_errors)
+                  continue
+
+              try:
+                  control_fields = extract_control_fields(nipkg_path)
+                  metadata = metadata_from_control_fields(control_fields)
+              except Exception as exc:
+                  errors.append(f'[{submission_dir.name}] {exc}')
+                  continue
+
+              metadata_errors = validate_package_metadata(
+                  metadata,
+                  submission_dir.name,
+                  require_embedded_icon=True,
+              )
+              if metadata_errors:
+                  errors.extend(metadata_errors)
+                  continue
+
+              size = nipkg_path.stat().st_size
+              if size > MAX_NIPKG_SIZE_BYTES:
+                  errors.append(
+                      f'[{submission_dir.name}] {nipkg_path.name} is {size} bytes (max {MAX_NIPKG_SIZE_BYTES})'
+                  )
+                  continue
+
+              location = 'local' if local_nipkg is not None else 'remote'
+              print(f'✓ {submission_dir}: validated {location} artifact {nipkg_path.name} ({size} bytes)')
+
+          if errors:
+              for error in errors:
+                  print(f'✗ {error}', file=sys.stderr)
+              sys.exit(1)
           PY
-            )
-
-            if [ -z "$NIPKG" ] || [ ! -f "$NIPKG" ]; then
-              echo "✗ $dir must include the .nipkg referenced by manifest.json" >&2
-              exit 1
-            fi
-
-            EXPECTED_SHA=$(jq -r '.sha256' "$dir/manifest.json")
-            ACTUAL_SHA=$(shasum -a 256 "$NIPKG" | awk '{print $1}')
-            if [ "$EXPECTED_SHA" != "$ACTUAL_SHA" ]; then
-              echo "✗ $NIPKG sha256 does not match manifest.json" >&2
-              exit 1
-            fi
-
-            if ! file "$NIPKG" | grep -q 'Debian binary package'; then
-              echo "✗ $NIPKG is not a Debian-style .nipkg package" >&2
-              exit 1
-            fi
-
-            MEMBERS=$(ar t "$NIPKG")
-            echo "$MEMBERS" | grep -qx 'debian-binary' || { echo "✗ $NIPKG is missing debian-binary" >&2; exit 1; }
-            echo "$MEMBERS" | grep -Eq '^control\.tar\.(gz|xz|zst)$' || { echo "✗ $NIPKG is missing control.tar.*" >&2; exit 1; }
-            echo "$MEMBERS" | grep -Eq '^data\.tar\.(gz|xz|zst)$' || { echo "✗ $NIPKG is missing data.tar.*" >&2; exit 1; }
-
-            echo "✓ $NIPKG looks like a valid .nipkg archive"
-          done <<< "$CHANGED_DIRS"
 
       - name: Run full validation
         run: python scripts/rebuild_index.py --validate-only
-
-      - name: Check .nipkg size
-        env:
-          CHANGED_DIRS: ${{ steps.changed.outputs.dirs }}
-        run: |
-          MAX_SIZE=$((100 * 1024 * 1024))  # 100 MB
-          while IFS= read -r dir; do
-            [ -z "$dir" ] && continue
-            for nipkg in "$dir"/*.nipkg; do
-              [ -f "$nipkg" ] || continue
-              SIZE=$(stat -c%s "$nipkg" 2>/dev/null || stat -f%z "$nipkg")
-              if [ "$SIZE" -gt "$MAX_SIZE" ]; then
-                echo "✗ $nipkg is ${SIZE} bytes (max ${MAX_SIZE})" >&2
-                exit 1
-              fi
-              echo "✓ $nipkg is ${SIZE} bytes (within limit)"
-            done
-          done
 
