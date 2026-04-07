@@ -134,7 +134,7 @@ systemlink-plugin-manager/
 ├── Packages.gz                       # Compressed index (for large catalogs)
 ├── submissions/                      # PR staging area for new/updated apps
 │   └── mycompany-asset-dashboard/
-│       ├── manifest.json             # Thin submission manifest (artifact path + SHA)
+│       ├── manifest.json             # Thin submission manifest (artifact path + SHA + optional source release)
 │       ├── mycompany-asset-dashboard_1.0.0_all.nipkg
 │       └── screenshot.png            # Optional screenshot (base64-encoded into attributes)
 ├── CONTRIBUTING.md                   # How to submit an app (see §6)
@@ -162,7 +162,7 @@ This URL is used as the `packageSources` entry when creating the replicated feed
 https://github.com/<org>/systemlink-plugin-manager/releases/download/v1.0.0/myapp_1.0.0_all.nipkg
 ```
 
-This hybrid approach keeps the git repository lean (no large binaries committed) while still serving a valid feed structure that SystemLink's Feed Service can replicate.
+This hybrid approach keeps the git repository lean while still serving a valid feed structure that SystemLink's Feed Service can replicate. Submission PRs may either commit the reviewed `.nipkg` directly or reference an immutable GitHub release asset via `sourceRepo` and `releaseTag`; after merge, the reviewed bytes are published from this repository's own releases so the feed remains stable.
 
 ### 3.4 Feed signing
 
