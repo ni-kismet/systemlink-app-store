@@ -13,7 +13,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: rebuild-index
+  group: main-writer-${{ github.ref_name }}
   cancel-in-progress: false
 
 jobs:
@@ -34,6 +34,8 @@ jobs:
 
       - name: Commit updated Packages files
         run: |
+          TARGET_BRANCH="${{ github.ref_name }}"
+
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add Packages Packages.gz
@@ -41,7 +43,19 @@ jobs:
             echo "No changes to Packages index."
           else
             git commit -m "chore: rebuild Packages index [skip ci]"
-            git push
+            for attempt in 1 2 3; do
+              if git push origin HEAD:"$TARGET_BRANCH"; then
+                break
+              fi
+
+              if [ "$attempt" -eq 3 ]; then
+                echo "✗ Failed to push rebuilt Packages index after $attempt attempts." >&2
+                exit 1
+              fi
+
+              git fetch origin "$TARGET_BRANCH"
+              git rebase "origin/$TARGET_BRANCH"
+            done
           fi
 
   deploy-pages:

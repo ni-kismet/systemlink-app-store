@@ -11,6 +11,10 @@ permissions:
   contents: write
   actions: write
 
+concurrency:
+  group: main-writer-${{ github.ref_name }}
+  cancel-in-progress: false
+
 jobs:
   publish:
     name: Build and publish webapp
@@ -55,6 +59,8 @@ jobs:
 
       - name: Commit version bump and sync
         run: |
+          TARGET_BRANCH="${{ github.ref_name }}"
+
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add webapp/package.json webapp/CHANGELOG.md \
@@ -65,7 +71,19 @@ jobs:
             echo "Nothing to commit."
           else
             git commit -m "chore: bump plugin manager to ${{ steps.version.outputs.version }} [skip ci]"
-            git push
+            for attempt in 1 2 3; do
+              if git push origin HEAD:"$TARGET_BRANCH"; then
+                break
+              fi
+
+              if [ "$attempt" -eq 3 ]; then
+                echo "✗ Failed to push version bump after $attempt attempts." >&2
+                exit 1
+              fi
+
+              git fetch origin "$TARGET_BRANCH"
+              git rebase "origin/$TARGET_BRANCH"
+            done
           fi
 
       - uses: actions/setup-node@v4
@@ -123,6 +141,8 @@ jobs:
 
       - name: Commit submission manifest
         run: |
+          TARGET_BRANCH="${{ github.ref_name }}"
+
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add submissions/systemlink-plugin-manager/manifest.json
@@ -130,7 +150,19 @@ jobs:
             echo "Manifest already up to date."
           else
             git commit -m "chore: update submission manifest for ${{ steps.version.outputs.version }} [skip ci]"
-            git push
+            for attempt in 1 2 3; do
+              if git push origin HEAD:"$TARGET_BRANCH"; then
+                break
+              fi
+
+              if [ "$attempt" -eq 3 ]; then
+                echo "✗ Failed to push submission manifest after $attempt attempts." >&2
+                exit 1
+              fi
+
+              git fetch origin "$TARGET_BRANCH"
+              git rebase "origin/$TARGET_BRANCH"
+            done
           fi
 
       - name: Create or update GitHub Release
