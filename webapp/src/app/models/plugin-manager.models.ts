@@ -122,7 +122,7 @@ export const FEED_NAME = 'Plugin Manager for SystemLink';
 export const PLUGIN_MANAGER_PACKAGE_NAME = 'systemlink-plugin-manager';
 
 /** Version of this Plugin Manager webapp build. */
-export const PLUGIN_MANAGER_VERSION = '1.0.1';
+export const PLUGIN_MANAGER_VERSION = '1.1.0';
 
 // ── WebApp property keys ──────────────────────────────────────────────────────
 

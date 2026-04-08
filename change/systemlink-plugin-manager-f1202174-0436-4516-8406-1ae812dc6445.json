@@ -1,7 +1,0 @@
-{
-  "type": "minor",
-  "comment": "Improve onboarding and feed management UX",
-  "packageName": "systemlink-plugin-manager",
-  "email": "1458528+fredvisser@users.noreply.github.com",
-  "dependentChangeType": "patch"
-}

@@ -1,8 +1,17 @@
 # Change Log - systemlink-plugin-manager
 
-<!-- This log was last generated on Tue, 07 Apr 2026 19:29:59 GMT and should not be manually modified. -->
+<!-- This log was last generated on Wed, 08 Apr 2026 17:14:15 GMT and should not be manually modified. -->
 
 <!-- Start content -->
+
+## 1.1.0
+
+Wed, 08 Apr 2026 17:14:15 GMT
+
+### Minor changes
+
+- `systemlink-plugin-manager`
+  - Improve onboarding and feed management UX (1458528+fredvisser@users.noreply.github.com)
 
 ## 1.0.1
 
