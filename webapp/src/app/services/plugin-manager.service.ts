@@ -142,15 +142,17 @@ export class PluginManagerService {
 
     try {
       const parsed = new URL(value, window.location.origin);
-      if (parsed.origin !== window.location.origin) return null;
-
-      const match = parsed.pathname.match(
-        /\/nifeed\/v1\/feeds\/([0-9a-f-]{36})(?:\/files(?:\/(?:packages(?:\.gz)?))?)?\/?$/i,
-      );
-      return match?.[1] ?? null;
+      return this.extractFeedIdFromPath(parsed.pathname);
     } catch {
-      return null;
+      return this.extractFeedIdFromPath(value);
     }
+  }
+
+  private extractFeedIdFromPath(path: string): string | null {
+    const match = path.match(
+      /\/(?:feeds\/([0-9a-f-]{36})\/packages|nifeed\/v1\/feeds\/([0-9a-f-]{36})(?:\/files(?:\/(?:packages(?:\.gz)?))?)?)\/?$/i,
+    );
+    return match?.[1] ?? match?.[2] ?? null;
   }
 
   private async listFeeds(): Promise<any[]> {

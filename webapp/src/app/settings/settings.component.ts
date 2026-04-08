@@ -242,10 +242,19 @@ export class SettingsComponent implements OnInit {
 
     try {
       const parsed = new URL(value, window.location.origin);
-      return parsed.origin === window.location.origin;
+      const current = new URL(window.location.origin);
+      return this.getSystemLinkHostKey(parsed.hostname) === this.getSystemLinkHostKey(current.hostname);
     } catch {
       return false;
     }
+  }
+
+  private getSystemLinkHostKey(hostname: string): string {
+    const parts = hostname.toLowerCase().split('.');
+    if (parts.length === 0) return hostname.toLowerCase();
+
+    parts[0] = parts[0].replace(/-api$/, '');
+    return parts.join('.');
   }
 
   private normalizeFeedUrl(url: string): string {
