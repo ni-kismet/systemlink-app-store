@@ -27,6 +27,18 @@
       <p>No feeds configured. Add a feed to get started.</p>
     </div>
 
+    <div *ngIf="canAddNiFeed" class="ni-feed-callout">
+      <div>
+        <h4>{{ niFeedConfigName }}</h4>
+        <p>
+          Register the official NI Plugin Manager feed. If the feed already exists in SystemLink, this reconnects it instead of creating a duplicate.
+        </p>
+      </div>
+      <nimble-button appearance="outline" (click)="addNiFeed()" [disabled]="!!refreshingFeedId || addingNiFeed || removingFeed">
+        {{ addingNiFeed ? 'Adding…' : niFeedActionLabel }}
+      </nimble-button>
+    </div>
+
     <div *ngFor="let feed of feeds" class="feed-row">
       <dl class="settings-list feed-details">
         <dt>Name</dt><dd>{{ feed.name }}</dd>
@@ -37,14 +49,16 @@
         <nimble-button appearance="outline" (click)="refreshFeed(feed)" [disabled]="!!refreshingFeedId">
           {{ isRefreshing(feed) ? 'Refreshing…' : 'Refresh' }}
         </nimble-button>
-        <nimble-button *ngIf="!isDefaultFeed(feed)" appearance="outline" (click)="openRemoveFeedDialog(feed)" [disabled]="!!refreshingFeedId || removingFeed">
+        <nimble-button appearance="outline" (click)="openRemoveFeedDialog(feed)" [disabled]="!!refreshingFeedId || removingFeed">
           Remove
         </nimble-button>
       </div>
     </div>
 
     <p class="hint">Refresh checks the source feed for updated packages and downloads them.</p>
-    <nimble-button appearance="outline" (click)="openAddFeedDialog()" [disabled]="!!refreshingFeedId">Add Feed</nimble-button>
+    <div class="section-actions">
+      <nimble-button appearance="outline" (click)="openAddFeedDialog()" [disabled]="!!refreshingFeedId">Add Feed</nimble-button>
+    </div>
   </section>
 
   <section class="settings-section">
@@ -87,7 +101,7 @@
   </span>
   <label *ngIf="feedPendingRemoval" class="remove-feed-option">
     <input type="checkbox" [(ngModel)]="deleteReplicatedFeedOnRemove" [disabled]="removingFeed" />
-    Delete the replicated SystemLink feed resource too
+    Delete the replicated SystemLink feed
   </label>
   <nimble-button appearance="ghost" slot="footer" (click)="closeRemoveFeedDialog()" [disabled]="removingFeed">Cancel</nimble-button>
   <nimble-button appearance="outline" slot="footer" (click)="removeFeed()" [disabled]="!feedPendingRemoval || removingFeed">

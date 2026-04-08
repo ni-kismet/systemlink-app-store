@@ -1,92 +1,65 @@
 <div class="onboarding-container">
   <div class="onboarding-card">
-    <h2>Welcome to Plugin Manager for SystemLink</h2>
+    <div class="onboarding-intro">
+      <p class="eyebrow">Setup</p>
+      <h2>Welcome to Plugin Manager for SystemLink</h2>
+      <p class="intro-copy">
+        Connect the main package feed so this SystemLink instance can discover and install Plugin Manager apps.
+      </p>
+    </div>
 
     <nimble-banner *ngIf="error" severity="error" [open]="true">
       {{ error }}
     </nimble-banner>
 
-    <!-- Feed conflict: already exists -->
-    <nimble-banner *ngIf="showFeedConflict" severity="warning" [open]="true">
-      <span>A feed from this URL already exists<span *ngIf="existingFeedName"> ("{{ existingFeedName }}")</span>.
-        You can use the existing feed or replace it with a fresh replication.</span>
-    </nimble-banner>
-    <div *ngIf="showFeedConflict" class="conflict-actions">
-      <nimble-button appearance="outline" (click)="useExistingFeed()" [disabled]="loading">
-        Use Existing Feed
-      </nimble-button>
-      <nimble-button appearance="ghost" (click)="replaceExistingFeed()" [disabled]="loading">
-        {{ loading ? 'Replacing…' : 'Replace Feed' }}
-      </nimble-button>
-    </div>
-
-    <!-- Step 1: Connect Feed -->
     <section class="step" [class.active]="step === 1" [class.done]="step > 1">
       <div class="step-header">
         <span class="step-number" [class.completed]="step > 1">1</span>
-        <span class="step-title">Connect to the Plugin Manager feed</span>
+        <span class="step-title">Connect the main Plugin Manager feed</span>
       </div>
       <div *ngIf="step === 1" class="step-body">
         <p>
-          The Plugin Manager needs to replicate the package feed from the
-          source URL into your local SystemLink instance.
+          Plugin Manager replicates the source feed into your local SystemLink instance so packages can be browsed and installed locally.
         </p>
         <label class="field-label">Feed URL</label>
         <nimble-text-field
           [(ngModel)]="feedUrl"
+          (ngModelChange)="onFeedUrlChange()"
           placeholder="https://…">
         </nimble-text-field>
-        <nimble-button appearance="outline" (click)="replicateFeed()" [disabled]="loading">
-          {{ loading ? 'Replicating…' : 'Replicate Feed' }}
-        </nimble-button>
+
+        <nimble-banner *ngIf="showFeedConflict" severity="warning" [open]="true">
+          A replicated feed already exists for this source URL<span *ngIf="existingFeedName"> ("{{ existingFeedName }}")</span>.
+          You can register that feed with Plugin Manager instead of creating a duplicate.
+        </nimble-banner>
+
+        <div *ngIf="showFeedConflict" class="conflict-actions">
+          <nimble-button appearance="outline" (click)="useExistingFeed()" [disabled]="loading">
+            Use Existing Feed
+          </nimble-button>
+          <nimble-button appearance="ghost" (click)="replaceExistingFeed()" [disabled]="loading">
+            {{ loading ? 'Replacing…' : 'Replace Feed' }}
+          </nimble-button>
+        </div>
+
+        <div class="step-actions">
+          <nimble-button appearance="outline" (click)="replicateFeed()" [disabled]="loading">
+            {{ loading ? 'Working…' : (showFeedConflict ? 'Replicate New Feed' : 'Replicate Feed') }}
+          </nimble-button>
+        </div>
       </div>
     </section>
 
-    <!-- Step 2: Optional additional feed -->
-    <section class="step" [class.active]="step === 2" [class.done]="step > 2">
+    <section class="step" [class.active]="step === 2">
       <div class="step-header">
-        <span class="step-number" [class.completed]="step > 2">2</span>
-        <span class="step-title">Add another feed (optional)</span>
+        <span class="step-number" [class.completed]="step >= 2">2</span>
+        <span class="step-title">You're all set</span>
       </div>
       <div *ngIf="step === 2" class="step-body">
         <p>
-          The main Plugin Manager feed has been registered. You can optionally
-          add an additional feed now — for example, an internal feed hosted
-          within your organisation.
+          The main feed is registered and Plugin Manager is ready to browse packages for this workspace.
         </p>
-        <label class="field-label">Feed URL</label>
-        <nimble-text-field
-          [(ngModel)]="optionalFeedUrl"
-          placeholder="https://…">
-        </nimble-text-field>
-        <label class="field-label">Display Name (optional)</label>
-        <nimble-text-field
-          [(ngModel)]="optionalFeedName"
-          placeholder="My Internal Feed">
-        </nimble-text-field>
-        <div class="step-actions">
-          <nimble-button appearance="outline" (click)="addOptionalFeed()" [disabled]="addingOptional || !optionalFeedUrl.trim()">
-            {{ addingOptional ? 'Adding…' : 'Replicate &amp; Add Feed' }}
-          </nimble-button>
-          <nimble-button appearance="ghost" (click)="skipAdditionalFeed()" [disabled]="addingOptional">
-            Skip
-          </nimble-button>
-        </div>
-        <p class="hint">You can add more feeds at any time from the <strong>Settings</strong> tab.</p>
-      </div>
-    </section>
-
-    <!-- Step 3: Done -->
-    <section class="step" [class.active]="step === 3">
-      <div class="step-header">
-        <span class="step-number" [class.completed]="step >= 3">3</span>
-        <span class="step-title">You're all set!</span>
-      </div>
-      <div *ngIf="step === 3" class="step-body">
-        <p>
-          Your Plugin Manager is ready. Browse plugins and install them
-          to your SystemLink instance.
-        </p>
+        <p class="hint">Additional feeds can be added later from Settings.</p>
         <nimble-button appearance="outline" (click)="goToCatalog()">
           Go to Catalog
         </nimble-button>

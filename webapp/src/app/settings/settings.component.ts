@@ -1,6 +1,6 @@
 import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
 import { Router } from '@angular/router';
-import { PLUGIN_MANAGER_VERSION, FeedConfig, DEFAULT_FEED_URL } from '../models/plugin-manager.models';
+import { PLUGIN_MANAGER_VERSION, FeedConfig, DEFAULT_FEED_URL, NI_FEED_CONFIG_NAME } from '../models/plugin-manager.models';
 import { PluginManagerService } from '../services/plugin-manager.service';
 
 @Component({
@@ -16,6 +16,7 @@ export class SettingsComponent implements OnInit {
   feeds: FeedConfig[] = [];
   installedCount = 0;
   readonly version = PLUGIN_MANAGER_VERSION;
+  readonly niFeedConfigName = NI_FEED_CONFIG_NAME;
 
   loading = true;
   refreshingFeedId: string | null = null;
@@ -26,9 +27,11 @@ export class SettingsComponent implements OnInit {
   addFeedUrl = '';
   addFeedName = '';
   addingFeed = false;
+  addingNiFeed = false;
   feedPendingRemoval: FeedConfig | null = null;
   deleteReplicatedFeedOnRemove = true;
   removingFeed = false;
+  availableNiFeed: { id: string; name: string } | null = null;
 
   constructor(
     private appStoreService: PluginManagerService,
@@ -37,12 +40,14 @@ export class SettingsComponent implements OnInit {
 
   async ngOnInit(): Promise<void> {
     try {
-      const [feedConfigs, installations] = await Promise.all([
+      const [feedConfigs, installations, availableNiFeed] = await Promise.all([
         this.appStoreService.loadFeedConfigs(),
         this.appStoreService.listInstalledWebapps().catch(() => [] as any[]),
+        this.appStoreService.discoverFeed().catch(() => null),
       ]);
       this.feeds = feedConfigs;
       this.installedCount = installations.length;
+      this.availableNiFeed = availableNiFeed;
     } catch (e: any) {
       this.error = e.message ?? 'Failed to load settings';
     } finally {
@@ -52,6 +57,17 @@ export class SettingsComponent implements OnInit {
 
   get hasFeedConfig(): boolean {
     return this.feeds.length > 0;
+  }
+
+  get canAddNiFeed(): boolean {
+    const configuredNiFeed = this.getConfiguredNiFeed();
+    if (!configuredNiFeed) return true;
+    if (!this.availableNiFeed) return true;
+    return configuredNiFeed.feedId !== this.availableNiFeed.id;
+  }
+
+  get niFeedActionLabel(): string {
+    return this.getConfiguredNiFeed() && !this.availableNiFeed ? 'Re-add NI Feed' : 'Add NI Feed';
   }
 
   async refreshFeed(feed: FeedConfig): Promise<void> {
@@ -76,18 +92,19 @@ export class SettingsComponent implements OnInit {
     if (this.addingFeed || !this.addFeedUrl.trim() || !this.addFeedName.trim()) return;
     this.addingFeed = true;
     this.error = '';
+    this.refreshResult = '';
     try {
       const name = this.addFeedName.trim();
-      const result = await this.appStoreService.replicateFeed(this.addFeedUrl.trim(), name);
+      const sourceUrl = this.addFeedUrl.trim();
+      const result = await this.appStoreService.replicateFeed(sourceUrl, name);
       const feedId = result.id ?? result.feedId ?? '';
       const feedConfig: FeedConfig = {
         name,
-        url: this.addFeedUrl.trim(),
+        url: sourceUrl,
         feedId,
       };
-      const updated = [...this.feeds.filter(f => f.feedId !== feedId), feedConfig];
-      await this.appStoreService.saveFeedConfigs(updated);
-      this.feeds = updated;
+      this.feeds = await this.appStoreService.upsertFeedConfig(feedConfig);
+      await this.refreshNiFeedAvailability();
       this.addFeedUrl = '';
       this.addFeedName = '';
       this.closeAddFeedDialog();
@@ -99,7 +116,7 @@ export class SettingsComponent implements OnInit {
   }
 
   openAddFeedDialog(): void {
-    this.addFeedUrl = DEFAULT_FEED_URL;
+    this.addFeedUrl = '';
     this.addFeedName = '';
     this.error = '';
     (this.addFeedDialogEl?.nativeElement as any)?.show();
@@ -131,12 +148,16 @@ export class SettingsComponent implements OnInit {
 
     try {
       if (this.deleteReplicatedFeedOnRemove && feedToRemove.feedId) {
-        await this.appStoreService.deleteReplicatedFeed(feedToRemove.feedId);
+        await this.appStoreService.deleteReplicatedFeedIfExists(feedToRemove.feedId);
       }
 
-      const updated = this.feeds.filter(f => f.feedId !== feedToRemove.feedId);
+      const updated = this.feeds.filter(feed =>
+        feed.feedId !== feedToRemove.feedId &&
+        this.normalizeFeedUrl(feed.url) !== this.normalizeFeedUrl(feedToRemove.url)
+      );
       await this.appStoreService.saveFeedConfigs(updated);
       this.feeds = updated;
+      await this.refreshNiFeedAvailability();
       this.closeRemoveFeedDialog(true);
     } catch (e: any) {
       this.error = `Failed to remove feed: ${e.message}`;
@@ -149,8 +170,36 @@ export class SettingsComponent implements OnInit {
     return this.refreshingFeedId === feed.feedId;
   }
 
-  isDefaultFeed(feed: FeedConfig): boolean {
+  async addNiFeed(): Promise<void> {
+    if (this.addingNiFeed) return;
+
+    this.addingNiFeed = true;
+    this.error = '';
+    this.refreshResult = '';
+    try {
+      const { created, feedConfig } = await this.appStoreService.ensureOfficialFeedRegistered();
+      this.feeds = await this.appStoreService.upsertFeedConfig(feedConfig);
+      await this.refreshNiFeedAvailability();
+      this.refreshResult = created
+        ? `Added "${feedConfig.name}".`
+        : `Registered "${feedConfig.name}" using the existing replicated feed.`;
+    } catch (e: any) {
+      this.error = `Failed to add NI feed: ${e.message}`;
+    } finally {
+      this.addingNiFeed = false;
+    }
+  }
+
+  isNiFeed(feed: FeedConfig): boolean {
     return this.normalizeFeedUrl(feed.url) === this.normalizeFeedUrl(DEFAULT_FEED_URL);
+  }
+
+  private getConfiguredNiFeed(): FeedConfig | undefined {
+    return this.feeds.find(feed => this.isNiFeed(feed));
+  }
+
+  private async refreshNiFeedAvailability(): Promise<void> {
+    this.availableNiFeed = await this.appStoreService.discoverFeed().catch(() => null);
   }
 
   private normalizeFeedUrl(url: string): string {

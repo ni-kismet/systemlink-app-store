@@ -1,6 +1,6 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
-import { FeedConfig, DEFAULT_FEED_URL, FEED_NAME } from '../models/plugin-manager.models';
+import { DEFAULT_FEED_URL, FEED_NAME, NI_FEED_CONFIG_NAME } from '../models/plugin-manager.models';
 import { PluginManagerService } from '../services/plugin-manager.service';
 
 @Component({
@@ -9,7 +9,7 @@ import { PluginManagerService } from '../services/plugin-manager.service';
   templateUrl: './onboarding.component.html',
   styleUrl: './onboarding.component.scss',
 })
-export class OnboardingComponent {
+export class OnboardingComponent implements OnInit {
   step = 1;
   feedUrl = DEFAULT_FEED_URL;
   feedId = '';
@@ -21,15 +21,21 @@ export class OnboardingComponent {
   existingFeedName = '';
   showFeedConflict = false;
 
-  // Step 2 – optional additional feed
-  optionalFeedUrl = '';
-  optionalFeedName = '';
-  addingOptional = false;
-
   constructor(
     private appStoreService: PluginManagerService,
     private router: Router,
   ) {}
+
+  async ngOnInit(): Promise<void> {
+    await this.checkForExistingFeed(this.feedUrl);
+  }
+
+  onFeedUrlChange(): void {
+    this.error = '';
+    this.showFeedConflict = false;
+    this.existingFeedId = '';
+    this.existingFeedName = '';
+  }
 
   async replicateFeed(): Promise<void> {
     if (this.loading || !this.feedUrl.trim()) return;
@@ -37,14 +43,23 @@ export class OnboardingComponent {
     this.error = '';
     this.showFeedConflict = false;
     try {
-      const result = await this.appStoreService.replicateFeed(this.feedUrl.trim());
+      const sourceUrl = this.feedUrl.trim();
+      const existingFeed = await this.appStoreService.findFeedBySourceUrl(sourceUrl).catch(() => null);
+      if (existingFeed) {
+        this.existingFeedId = existingFeed.id;
+        this.existingFeedName = existingFeed.name;
+        this.showFeedConflict = true;
+        return;
+      }
+
+      const result = await this.appStoreService.replicateFeed(sourceUrl, this.getPreferredFeedName(sourceUrl));
       this.feedId = result.id ?? result.feedId ?? '';
       await this.saveMainFeedAndAdvance();
     } catch (e: any) {
       const msg = typeof e.message === 'string' ? e.message : '';
       // Detect "feed already exists" style errors and offer to use the existing feed.
       if (msg.toLowerCase().includes('already') || msg.toLowerCase().includes('duplicate') || msg.toLowerCase().includes('conflict')) {
-        const existing = await this.appStoreService.findFeedBySourceUrl(this.feedUrl.trim());
+        const existing = await this.appStoreService.findFeedBySourceUrl(this.feedUrl.trim()).catch(() => null);
         if (existing) {
           this.existingFeedId = existing.id;
           this.existingFeedName = existing.name;
@@ -81,8 +96,9 @@ export class OnboardingComponent {
     this.error = '';
     this.showFeedConflict = false;
     try {
-      await this.appStoreService.deleteReplicatedFeed(this.existingFeedId);
-      const result = await this.appStoreService.replicateFeed(this.feedUrl.trim());
+      await this.appStoreService.deleteReplicatedFeedIfExists(this.existingFeedId);
+      const sourceUrl = this.feedUrl.trim();
+      const result = await this.appStoreService.replicateFeed(sourceUrl, this.getPreferredFeedName(sourceUrl));
       this.feedId = result.id ?? result.feedId ?? '';
       await this.saveMainFeedAndAdvance();
     } catch (e: any) {
@@ -93,48 +109,45 @@ export class OnboardingComponent {
   }
 
   private async saveMainFeedAndAdvance(): Promise<void> {
-    const mainFeedConfig: FeedConfig = {
-      name: FEED_NAME,
-      url: this.feedUrl.trim(),
+    const sourceUrl = this.feedUrl.trim();
+    const mainFeedConfig = {
+      name: this.getPreferredFeedName(sourceUrl),
+      url: sourceUrl,
       feedId: this.feedId,
     };
-    const existing = await this.appStoreService.loadFeedConfigs();
-    const updated = [...existing.filter(f => f.feedId !== this.feedId), mainFeedConfig];
-    await this.appStoreService.saveFeedConfigs(updated);
+    await this.appStoreService.upsertFeedConfig(mainFeedConfig);
     // Tag the Plugin Manager's own webapp so it appears as installed in the catalog.
-    await this.appStoreService.tagOwnWebapp(this.feedId, this.feedUrl.trim());
+    await this.appStoreService.tagOwnWebapp(this.feedId, sourceUrl);
     this.step = 2;
-  }
-
-  async addOptionalFeed(): Promise<void> {
-    if (this.addingOptional || !this.optionalFeedUrl.trim()) return;
-    this.addingOptional = true;
-    this.error = '';
-    try {
-      const result = await this.appStoreService.replicateFeed(this.optionalFeedUrl.trim());
-      const optFeedId = result.id ?? result.feedId ?? '';
-      const feedConfig: FeedConfig = {
-        name: this.optionalFeedName.trim() || 'Additional Feed',
-        url: this.optionalFeedUrl.trim(),
-        feedId: optFeedId,
-      };
-      const existing = await this.appStoreService.loadFeedConfigs();
-      const updated = [...existing.filter(f => f.feedId !== optFeedId), feedConfig];
-      await this.appStoreService.saveFeedConfigs(updated);
-      this.step = 3;
-    } catch (e: any) {
-      this.error = `Failed to add feed: ${e.message}`;
-    } finally {
-      this.addingOptional = false;
-    }
-  }
-
-  skipAdditionalFeed(): void {
-    this.step = 3;
   }
 
   goToCatalog(): void {
     this.router.navigate(['/catalog']);
+  }
+
+  private async checkForExistingFeed(feedUrl: string): Promise<void> {
+    try {
+      const existingFeed = await this.appStoreService.findFeedBySourceUrl(feedUrl);
+      this.existingFeedId = existingFeed?.id ?? '';
+      this.existingFeedName = existingFeed?.name ?? '';
+      this.showFeedConflict = !!existingFeed;
+    } catch {
+      this.showFeedConflict = false;
+      this.existingFeedId = '';
+      this.existingFeedName = '';
+    }
+  }
+
+  private getPreferredFeedName(feedUrl: string): string {
+    return this.isOfficialFeedUrl(feedUrl) ? NI_FEED_CONFIG_NAME : FEED_NAME;
+  }
+
+  private isOfficialFeedUrl(feedUrl: string): boolean {
+    return this.normalizeFeedUrl(feedUrl) === this.normalizeFeedUrl(DEFAULT_FEED_URL);
+  }
+
+  private normalizeFeedUrl(feedUrl: string): string {
+    return feedUrl.trim().replace(/\/+$/, '').toLowerCase();
   }
 }
 

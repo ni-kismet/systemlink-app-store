@@ -3,10 +3,12 @@ import {
   AppPackage,
   AppType,
   FeedConfig,
+  DEFAULT_FEED_URL,
   InstalledApp,
   WorkspaceInfo,
   WorkspaceInstallation,
   FEED_NAME,
+  NI_FEED_CONFIG_NAME,
   PLUGIN_MANAGER_PACKAGE_NAME,
   PLUGIN_MANAGER_VERSION,
   SL_PLUGIN_MANAGER_PROP_FEEDS,
@@ -110,24 +112,75 @@ export class PluginManagerService {
 
   // ── Feed Service ──────────────────────────────────────────────
 
-  /** List all feeds and find the default Plugin Manager feed by name. */
-  async discoverFeed(): Promise<{ id: string; name: string } | null> {
+  private normalizeFeedUrl(url: string): string {
+    return url.trim().replace(/\/+$/, '').toLowerCase();
+  }
+
+  private isSameFeedUrl(left: string, right: string): boolean {
+    return this.normalizeFeedUrl(left) === this.normalizeFeedUrl(right);
+  }
+
+  private async listFeeds(): Promise<any[]> {
     const { data, error } = await getNifeedV1Feeds({ client: this.feedsClient });
     if (error) throw new Error(`Failed to list feeds: ${JSON.stringify(error)}`);
-    const feeds = data?.feeds ?? [];
-    const feed = feeds.find(f => f.name === FEED_NAME);
+    return data?.feeds ?? [];
+  }
+
+  /** List all feeds and find the default Plugin Manager feed by name. */
+  async discoverFeed(): Promise<{ id: string; name: string } | null> {
+    const feeds = await this.listFeeds();
+    const feed = feeds.find(f =>
+      (f as any).packageSources?.some((src: string) => this.isSameFeedUrl(src, DEFAULT_FEED_URL))
+    ) ?? feeds.find(f => f.name === NI_FEED_CONFIG_NAME || f.name === FEED_NAME);
     return feed?.id ? { id: feed.id, name: feed.name! } : null;
   }
 
   /** Find an existing feed whose packageSources contain the given URL. */
   async findFeedBySourceUrl(sourceUrl: string): Promise<{ id: string; name: string } | null> {
-    const { data, error } = await getNifeedV1Feeds({ client: this.feedsClient });
-    if (error) return null;
-    const feeds = data?.feeds ?? [];
+    const feeds = await this.listFeeds();
     const feed = feeds.find(f =>
-      (f as any).packageSources?.some((src: string) => src === sourceUrl)
+      (f as any).packageSources?.some((src: string) => this.isSameFeedUrl(src, sourceUrl))
     );
     return feed?.id ? { id: feed.id, name: feed.name ?? '' } : null;
+  }
+
+  /** Ensure the official NI feed exists in SystemLink and return its config payload. */
+  async ensureOfficialFeedRegistered(): Promise<{ created: boolean; feedConfig: FeedConfig }> {
+    const existingFeed = await this.findFeedBySourceUrl(DEFAULT_FEED_URL);
+    if (existingFeed) {
+      return {
+        created: false,
+        feedConfig: {
+          name: NI_FEED_CONFIG_NAME,
+          url: DEFAULT_FEED_URL,
+          feedId: existingFeed.id,
+        },
+      };
+    }
+
+    const result = await this.replicateFeed(DEFAULT_FEED_URL, NI_FEED_CONFIG_NAME);
+    return {
+      created: true,
+      feedConfig: {
+        name: NI_FEED_CONFIG_NAME,
+        url: DEFAULT_FEED_URL,
+        feedId: result.id ?? result.feedId ?? '',
+      },
+    };
+  }
+
+  /** Add or replace a feed config, deduplicating by feed ID and normalized source URL. */
+  async upsertFeedConfig(feedConfig: FeedConfig): Promise<FeedConfig[]> {
+    const existing = await this.loadFeedConfigs();
+    const updated = [
+      ...existing.filter(feed =>
+        feed.feedId !== feedConfig.feedId &&
+        !this.isSameFeedUrl(feed.url, feedConfig.url)
+      ),
+      feedConfig,
+    ];
+    await this.saveFeedConfigs(updated);
+    return updated;
   }
 
   /** List all packages in a feed via the Feed Service packages API.
@@ -200,6 +253,23 @@ export class PluginManagerService {
       path: { feedId },
     });
     if (error) throw new Error(`Failed to delete feed: ${JSON.stringify(error)}`);
+  }
+
+  /** Delete a replicated feed, ignoring not-found responses so config cleanup can continue. */
+  async deleteReplicatedFeedIfExists(feedId: string): Promise<void> {
+    try {
+      await this.deleteReplicatedFeed(feedId);
+    } catch (error: any) {
+      const message = String(error?.message ?? error).toLowerCase();
+      if (
+        message.includes('404') ||
+        message.includes('not found') ||
+        message.includes('does not exist')
+      ) {
+        return;
+      }
+      throw error;
+    }
   }
 
   private async waitForFeedJob(jobId: string, action: string): Promise<any> {
