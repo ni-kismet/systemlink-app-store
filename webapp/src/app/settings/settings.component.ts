@@ -249,7 +249,11 @@ export class SettingsComponent implements OnInit {
   }
 
   private normalizeFeedUrl(url: string): string {
-    return url.trim().replace(/\/+$/, '').toLowerCase();
+    return url
+      .trim()
+      .replace(/\/+$/, '')
+      .replace(/\/(packages(?:\.gz)?)$/i, '')
+      .toLowerCase();
   }
 }
 

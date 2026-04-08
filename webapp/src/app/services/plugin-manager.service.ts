@@ -113,11 +113,44 @@ export class PluginManagerService {
   // ── Feed Service ──────────────────────────────────────────────
 
   private normalizeFeedUrl(url: string): string {
-    return url.trim().replace(/\/+$/, '').toLowerCase();
+    const value = url.trim();
+    if (!value) return '';
+
+    try {
+      const parsed = new URL(value, window.location.origin);
+      parsed.hash = '';
+      parsed.search = '';
+      parsed.pathname = parsed.pathname
+        .replace(/\/+$/, '')
+        .replace(/\/(packages(?:\.gz)?)$/i, '');
+      return parsed.toString().replace(/\/+$/, '').toLowerCase();
+    } catch {
+      return value
+        .replace(/\/+$/, '')
+        .replace(/\/(packages(?:\.gz)?)$/i, '')
+        .toLowerCase();
+    }
   }
 
   private isSameFeedUrl(left: string, right: string): boolean {
     return this.normalizeFeedUrl(left) === this.normalizeFeedUrl(right);
+  }
+
+  private extractLocalFeedId(url: string): string | null {
+    const value = url.trim();
+    if (!value) return null;
+
+    try {
+      const parsed = new URL(value, window.location.origin);
+      if (parsed.origin !== window.location.origin) return null;
+
+      const match = parsed.pathname.match(
+        /\/nifeed\/v1\/feeds\/([0-9a-f-]{36})(?:\/files(?:\/(?:packages(?:\.gz)?))?)?\/?$/i,
+      );
+      return match?.[1] ?? null;
+    } catch {
+      return null;
+    }
   }
 
   private async listFeeds(): Promise<any[]> {
@@ -140,8 +173,14 @@ export class PluginManagerService {
     const feeds = await this.listFeeds();
     const feed = feeds.find(f =>
       (f as any).packageSources?.some((src: string) => this.isSameFeedUrl(src, sourceUrl))
-    );
+    ) ?? this.findLocalFeedByUrl(feeds, sourceUrl);
     return feed?.id ? { id: feed.id, name: feed.name ?? '' } : null;
+  }
+
+  private findLocalFeedByUrl(feeds: any[], sourceUrl: string): any | null {
+    const localFeedId = this.extractLocalFeedId(sourceUrl);
+    if (!localFeedId) return null;
+    return feeds.find(feed => feed.id === localFeedId) ?? null;
   }
 
   /** Ensure the official NI feed exists in SystemLink and return its config payload. */

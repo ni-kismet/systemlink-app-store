@@ -147,7 +147,11 @@ export class OnboardingComponent implements OnInit {
   }
 
   private normalizeFeedUrl(feedUrl: string): string {
-    return feedUrl.trim().replace(/\/+$/, '').toLowerCase();
+    return feedUrl
+      .trim()
+      .replace(/\/+$/, '')
+      .replace(/\/(packages(?:\.gz)?)$/i, '')
+      .toLowerCase();
   }
 }
 
