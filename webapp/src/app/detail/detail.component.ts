@@ -1,5 +1,5 @@
 import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { AppPackage, FeedConfig, InstalledApp, WorkspaceInfo, WorkspaceInstallation } from '../models/plugin-manager.models';
 import { PluginManagerService } from '../services/plugin-manager.service';
 import { formatBytes } from '../utils/semver';
@@ -20,6 +20,7 @@ interface WorkspaceInstallOption {
 })
 export class AppDetailComponent implements OnInit {
   pkg: AppPackage | null = null;
+  activeScreenshot: string | null = null;
   /** Installation record for the current workspace (null if not installed here). */
   installed: InstalledApp | null = null;
   feedId: string | null = null;
@@ -45,6 +46,7 @@ export class AppDetailComponent implements OnInit {
   constructor(
     private route: ActivatedRoute,
     private appStoreService: PluginManagerService,
+    private router: Router,
   ) {}
 
   async ngOnInit(): Promise<void> {
@@ -77,27 +79,21 @@ export class AppDetailComponent implements OnInit {
       this.feedId = feedConfigs[0]?.feedId ?? null;
       this.feedConfig = feedConfigs[0] ?? null;
 
-      // Discover feed if not configured
       if (feedConfigs.length === 0) {
-        const feed = await this.appStoreService.discoverFeed();
-        if (feed) { this.feedId = feed.id; this.feedConfig = null; }
-      }
-
-      if (feedConfigs.length === 0 && !this.feedId) {
-        this.error = 'Feed not found. Please complete onboarding first.';
+        this.router.navigate(['/onboarding']);
         return;
       }
 
       // Load packages from ALL configured feeds and find by packageName
-      const packages = feedConfigs.length > 0
-        ? await this.appStoreService.listPackagesFromFeeds(feedConfigs)
-        : await this.appStoreService.listPackages(this.feedId!);
+      const packages = await this.appStoreService.listPackagesFromFeeds(feedConfigs);
       this.pkg = packages.find(p => p.packageName === packageName) ?? null;
 
       if (!this.pkg) {
         this.error = `Package "${packageName}" not found in the catalog.`;
         return;
       }
+
+      this.activeScreenshot = this.pkg.screenshots[0] ?? null;
 
       this.refreshWorkspaceState(packageName, readableWorkspaces);
     } catch (e: any) {
@@ -117,6 +113,10 @@ export class AppDetailComponent implements OnInit {
 
   get installedSomewhere(): boolean {
     return this.workspaceInstallations.length > 0;
+  }
+
+  get hasScreenshots(): boolean {
+    return !!this.pkg?.screenshots.length;
   }
 
   get installableWorkspaces(): WorkspaceInstallOption[] {
@@ -221,6 +221,19 @@ export class AppDetailComponent implements OnInit {
     return this.originalInstalledIds.has(id);
   }
 
+  setActiveScreenshot(screenshot: string): void {
+    this.activeScreenshot = screenshot;
+  }
+
+  isActiveScreenshot(screenshot: string): boolean {
+    return this.activeScreenshot === screenshot;
+  }
+
+  getScreenshotAlt(index: number): string {
+    const displayName = this.pkg?.displayName ?? 'Package';
+    return `${displayName} screenshot ${index + 1}`;
+  }
+
   async applyWorkspaceChanges(): Promise<void> {
     if (!this.pkg || this.actionLoading) return;
     const feedId = this.pkg.sourceFeedId ?? this.feedId;
@@ -308,6 +321,10 @@ export class AppDetailComponent implements OnInit {
 
   trackWorkspaceById(_: number, option: WorkspaceInstallOption): string {
     return option.workspaceId;
+  }
+
+  trackScreenshot(_: number, screenshot: string): string {
+    return screenshot;
   }
 
   private async reloadWorkspaceState(): Promise<void> {

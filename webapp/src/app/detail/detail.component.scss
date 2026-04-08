@@ -54,14 +54,26 @@
   font: var(--sl-app-font-title-plus-1);
 }
 
-.pkg-author {
+.pkg-author,
+.workspace-summary,
+.workspace-installation-name,
+.pending-workspace-name,
+.meta-link {
   font: var(--sl-app-font-body);
+}
+
+.pkg-author,
+.pkg-version,
+.workspace-summary,
+.workspace-installation-version,
+.pending-workspace-current {
   color: var(--sl-app-color-text-muted);
 }
 
-.pkg-version {
+.pkg-version,
+.workspace-installation-version,
+.pending-workspace-current {
   font: var(--sl-app-font-control-label);
-  color: var(--sl-app-color-text-muted);
 }
 
 .header-actions {
@@ -92,17 +104,60 @@
   margin-top: var(--sl-app-space-6);
 }
 
-.screenshot-grid {
+.screenshot-viewer {
   display: flex;
+  flex-direction: column;
   gap: var(--sl-app-space-3);
-  flex-wrap: wrap;
 }
 
-.screenshot-img {
-  max-width: 100%;
-  max-height: 18.75rem;
-  border-radius: var(--sl-app-space-1);
+.screenshot-stage {
+  display: grid;
+  place-items: center;
+  min-height: 18rem;
+  padding: var(--sl-app-space-3);
   border: 1px solid var(--sl-app-color-border);
+  border-radius: var(--sl-app-space-2);
+  background: var(--ni-nimble-section-background-color);
+}
+
+.screenshot-stage-img {
+  display: block;
+  max-width: 100%;
+  max-height: 28rem;
+  object-fit: contain;
+  border-radius: var(--sl-app-space-1);
+}
+
+.screenshot-thumbnails {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sl-app-space-2);
+}
+
+.screenshot-thumb {
+  width: 7rem;
+  padding: 0;
+  border: 1px solid var(--sl-app-color-border);
+  border-radius: var(--sl-app-space-1);
+  background: var(--ni-nimble-section-background-color);
+  cursor: pointer;
+  overflow: hidden;
+
+  &:focus-visible {
+    outline: 2px solid var(--sl-app-color-accent);
+    outline-offset: 2px;
+  }
+
+  &.is-active {
+    border-color: var(--sl-app-color-accent);
+  }
+}
+
+.screenshot-thumb-img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
 }
 
 .detail-sidebar {
@@ -137,7 +192,6 @@
 
 .meta-link {
   margin-bottom: var(--sl-app-space-2);
-  font: var(--sl-app-font-body);
 }
 
 .installed-info {
@@ -148,8 +202,6 @@
 
 .workspace-summary {
   margin: 0 0 var(--sl-app-space-3);
-  font: var(--sl-app-font-body);
-  color: var(--sl-app-color-text-muted);
 }
 
 .workspace-installations {
@@ -168,15 +220,6 @@
 
 .workspace-installation-spacer {
   flex: 1;
-}
-
-.workspace-installation-name {
-  font: var(--sl-app-font-body);
-}
-
-.workspace-installation-version {
-  font: var(--sl-app-font-control-label);
-  color: var(--sl-app-color-text-muted);
 }
 
 .workspace-select {
@@ -205,12 +248,6 @@
 
 .pending-workspace-name {
   flex: 1;
-  font: var(--sl-app-font-body);
-}
-
-.pending-workspace-current {
-  font: var(--sl-app-font-control-label);
-  color: var(--sl-app-color-text-muted);
 }
 
 .pending-workspace-remove {
@@ -235,5 +272,18 @@
 
   .header-actions {
     width: 100%;
+  }
+
+  .screenshot-stage {
+    min-height: 12rem;
+    padding: var(--sl-app-space-2);
+  }
+
+  .screenshot-stage-img {
+    max-height: 20rem;
+  }
+
+  .screenshot-thumb {
+    width: 5.5rem;
   }
 }

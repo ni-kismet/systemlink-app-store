@@ -61,19 +61,15 @@ export class CatalogComponent implements OnInit {
         }
       }
 
-      // 3. If no feed configured, fall back to feed discovery then go to onboarding
+      // 3. Force onboarding when no feed is registered so the saved config and
+      // Plugin Manager metadata are created, even if a replicated feed exists.
       if (feedConfigs.length === 0) {
-        const feed = await this.appStoreService.discoverFeed();
-        if (!feed) {
-          this.router.navigate(['/onboarding']);
-          return;
-        }
-        this.feedId = feed.id;
-        this.packages = await this.appStoreService.listPackages(this.feedId);
-      } else {
-        // 4. Load packages from ALL configured feeds in parallel
-        this.packages = await this.appStoreService.listPackagesFromFeeds(feedConfigs);
+        this.router.navigate(['/onboarding']);
+        return;
       }
+
+      // 4. Load packages from ALL configured feeds in parallel
+      this.packages = await this.appStoreService.listPackagesFromFeeds(feedConfigs);
       this.categories = [...new Set(this.packages.map(p => p.category).filter(Boolean))].sort();
       this.applyFilters();
     } catch (e: any) {

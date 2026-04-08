@@ -39,10 +39,25 @@
         <h3>Description</h3>
         <p class="description-text">{{ pkg.description }}</p>
 
-        <div *ngIf="pkg.screenshots.length > 0" class="screenshots">
+        <div *ngIf="hasScreenshots" class="screenshots">
           <h3>Screenshots</h3>
-          <div class="screenshot-grid">
-            <img *ngFor="let ss of pkg.screenshots" [src]="ss" alt="Screenshot" class="screenshot-img" />
+          <div class="screenshot-viewer">
+            <div class="screenshot-stage" *ngIf="activeScreenshot">
+              <img
+                [src]="activeScreenshot"
+                [alt]="getScreenshotAlt(pkg.screenshots.indexOf(activeScreenshot))"
+                class="screenshot-stage-img" />
+            </div>
+            <div class="screenshot-thumbnails">
+              <button
+                *ngFor="let ss of pkg.screenshots; let index = index; trackBy: trackScreenshot"
+                type="button"
+                class="screenshot-thumb"
+                [class.is-active]="isActiveScreenshot(ss)"
+                (click)="setActiveScreenshot(ss)">
+                <img [src]="ss" [alt]="getScreenshotAlt(index)" class="screenshot-thumb-img" />
+              </button>
+            </div>
           </div>
         </div>
       </div>

@@ -112,6 +112,9 @@ export const APP_TYPE_LABELS: Record<AppType, string> = {
 /** Default feed URL for the official Plugin Manager feed source. */
 export const DEFAULT_FEED_URL = 'https://ni-kismet.github.io/systemlink-plugin-manager/';
 
+/** Preferred display name for the official NI Plugin Manager feed in the UI. */
+export const NI_FEED_CONFIG_NAME = 'NI Feed - Plugin Manager for SystemLink';
+
 /** Well-known feed name used for discovery. */
 export const FEED_NAME = 'Plugin Manager for SystemLink';
 
