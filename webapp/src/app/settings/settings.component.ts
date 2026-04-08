@@ -26,6 +26,8 @@ export class SettingsComponent implements OnInit {
   // Add-feed form
   addFeedUrl = '';
   addFeedName = '';
+  addFeedShouldReplicate = true;
+  private addFeedReplicationDefault = true;
   addingFeed = false;
   addingNiFeed = false;
   feedPendingRemoval: FeedConfig | null = null;
@@ -96,8 +98,20 @@ export class SettingsComponent implements OnInit {
     try {
       const name = this.addFeedName.trim();
       const sourceUrl = this.addFeedUrl.trim();
-      const result = await this.appStoreService.replicateFeed(sourceUrl, name);
-      const feedId = result.id ?? result.feedId ?? '';
+      const shouldReplicate = this.addFeedShouldReplicate;
+      let feedId = '';
+
+      if (shouldReplicate) {
+        const result = await this.appStoreService.replicateFeed(sourceUrl, name);
+        feedId = result.id ?? result.feedId ?? '';
+      } else {
+        const existingFeed = await this.appStoreService.findFeedBySourceUrl(sourceUrl).catch(() => null);
+        if (!existingFeed?.id) {
+          throw new Error('No existing SystemLink feed matches this URL. Enable replication to create one.');
+        }
+        feedId = existingFeed.id;
+      }
+
       const feedConfig: FeedConfig = {
         name,
         url: sourceUrl,
@@ -118,12 +132,32 @@ export class SettingsComponent implements OnInit {
   openAddFeedDialog(): void {
     this.addFeedUrl = '';
     this.addFeedName = '';
+    this.addFeedShouldReplicate = true;
+    this.addFeedReplicationDefault = true;
     this.error = '';
     (this.addFeedDialogEl?.nativeElement as any)?.show();
   }
 
   closeAddFeedDialog(): void {
     (this.addFeedDialogEl?.nativeElement as any)?.close();
+  }
+
+  onAddFeedUrlChange(): void {
+    const nextDefault = !this.isSystemLinkHostedFeedUrl(this.addFeedUrl);
+    if (this.addFeedShouldReplicate === this.addFeedReplicationDefault) {
+      this.addFeedShouldReplicate = nextDefault;
+    }
+    this.addFeedReplicationDefault = nextDefault;
+  }
+
+  get addFeedSubmitLabel(): string {
+    return this.addFeedShouldReplicate ? 'Replicate & Add Feed' : 'Register Feed';
+  }
+
+  get addFeedReplicationHint(): string {
+    return this.isSystemLinkHostedFeedUrl(this.addFeedUrl)
+      ? 'SystemLink-hosted feeds usually do not need replication. They can be registered directly.'
+      : 'Replication creates a local SystemLink feed from the source URL before registering it.';
   }
 
   openRemoveFeedDialog(feed: FeedConfig): void {
@@ -200,6 +234,18 @@ export class SettingsComponent implements OnInit {
 
   private async refreshNiFeedAvailability(): Promise<void> {
     this.availableNiFeed = await this.appStoreService.discoverFeed().catch(() => null);
+  }
+
+  private isSystemLinkHostedFeedUrl(url: string): boolean {
+    const value = url.trim();
+    if (!value) return false;
+
+    try {
+      const parsed = new URL(value, window.location.origin);
+      return parsed.origin === window.location.origin;
+    } catch {
+      return false;
+    }
   }
 
   private normalizeFeedUrl(url: string): string {

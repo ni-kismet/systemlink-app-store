@@ -80,6 +80,7 @@
     <label class="field-label">Feed URL</label>
     <nimble-text-field
       [(ngModel)]="addFeedUrl"
+      (ngModelChange)="onAddFeedUrlChange()"
       placeholder="https://your-feed-url">
     </nimble-text-field>
     <label class="field-label">Display Name</label>
@@ -87,10 +88,15 @@
       [(ngModel)]="addFeedName"
       placeholder="My Internal Feed">
     </nimble-text-field>
+    <label class="checkbox-option">
+      <input type="checkbox" [(ngModel)]="addFeedShouldReplicate" />
+      Replicate feed into SystemLink first
+    </label>
+    <p class="hint form-hint">{{ addFeedReplicationHint }}</p>
   </div>
   <nimble-button appearance="ghost" slot="footer" (click)="closeAddFeedDialog()">Cancel</nimble-button>
   <nimble-button appearance="outline" slot="footer" (click)="addFeed()" [disabled]="addingFeed || !addFeedUrl.trim() || !addFeedName.trim()">
-    {{ addingFeed ? 'Adding…' : 'Replicate & Add Feed' }}
+    {{ addingFeed ? 'Adding…' : addFeedSubmitLabel }}
   </nimble-button>
 </nimble-dialog>
 

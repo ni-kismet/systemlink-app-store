@@ -163,6 +163,23 @@ nimble-text-field {
   margin-bottom: var(--sl-app-space-3);
 }
 
+.checkbox-option {
+  display: flex;
+  align-items: center;
+  gap: var(--sl-app-space-2);
+  margin-bottom: var(--sl-app-space-2);
+  color: var(--sl-app-color-text);
+  font: var(--sl-app-font-body);
+
+  input {
+    margin: 0;
+  }
+}
+
+.form-hint {
+  margin-top: 0;
+}
+
 .section-actions {
   display: flex;
   flex-wrap: wrap;
