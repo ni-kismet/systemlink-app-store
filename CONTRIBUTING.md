@@ -119,6 +119,21 @@ slcli plugin-manager publish dist/browser/ \
 
 This generates the `.nipkg` file, `manifest.json`, and a ready-to-commit branch.
 
+If you are already packaging with `@ni-kismet/sl-webapp-nipkg` in your own repository, prefer generating the thin submission manifest during the package build instead of hashing the artifact in a separate script:
+
+```bash
+./node_modules/.bin/sl-webapp-nipkg build \
+  --config nipkg.config.json \
+  --output-dir dist/nipkg \
+  --manifest \
+  --manifest-output submission-manifest.json \
+  --source-repo yourorg/your-repo \
+  --release-tag my-app-v1.0.0 \
+  --source-commit "$(git rev-parse HEAD)"
+```
+
+This emits the reviewed `.nipkg` and the schema v2 submission manifest from the same command, which avoids metadata drift between packaging and manifest generation.
+
 Alternatively, you can manually create a `.nipkg` using NI Package Manager tools.
 
 ## Updating your app
@@ -154,7 +169,18 @@ Source repo (your webapps)              systemlink-plugin-manager
 
 1. **Create a PAT** (classic) with `repo` scope that has access to the `systemlink-plugin-manager` repository. Store it as a secret named `PLUGIN_MANAGER_DISPATCH_TOKEN` in your source repository.
 
-2. **Generate a thin submission manifest** during your release workflow after packaging the `.nipkg`. It must conform to [`app-manifest.schema.json`](app-manifest.schema.json).
+2. **Generate a thin submission manifest** during your release workflow after packaging the `.nipkg`. It must conform to [`app-manifest.schema.json`](app-manifest.schema.json). If you use `@ni-kismet/sl-webapp-nipkg`, prefer generating it directly from the packaging step:
+
+```bash
+./node_modules/.bin/sl-webapp-nipkg build \
+  --config nipkg.config.json \
+  --output-dir dist/nipkg \
+  --manifest \
+  --manifest-output submission-manifest.json \
+  --source-repo yourorg/your-repo \
+  --release-tag my-app-v1.0.0 \
+  --source-commit "$GITHUB_SHA"
+```
 
 3. **Add the publish workflow** to your source repository. See [`.github/examples/publish-to-plugin-manager.yml`](.github/examples/publish-to-plugin-manager.yml) for a complete, ready-to-use example with a 5-app matrix build.
 

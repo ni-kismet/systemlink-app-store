@@ -138,7 +138,7 @@ jobs:
         id: build_nipkg
         run: |
           rm -rf dist/nipkg
-          npx -y @ni-kismet/sl-webapp-nipkg@1.1.0 build \
+          ./node_modules/.bin/sl-webapp-nipkg build \
             --config nipkg.config.json \
             --output-dir dist/nipkg
           NIPKG=$(find dist/nipkg -maxdepth 1 -name '*.nipkg' | head -1)

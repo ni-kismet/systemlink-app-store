@@ -410,6 +410,10 @@ slcli plugin-manager publish <WEBAPP_DIR> [--manifest <FILE>] [OPTIONS]
     # With --prepare-pr: creates a ready-to-commit branch with the .nipkg,
     #   manifest.json, and any optional review assets, streamlining the PR workflow.
 
+  # For source repositories that package with @ni-kismet/sl-webapp-nipkg directly,
+  # prefer generating the reviewed artifact and thin submission manifest together:
+  sl-webapp-nipkg build --config nipkg.config.json --output-dir dist/nipkg --manifest
+
 slcli plugin-manager validate <NIPKG_FILE>
   # Validate a .nipkg against Plugin Manager metadata requirements:
     # - semver version format
@@ -472,6 +476,8 @@ Developer                                GitHub Repo                          Ma
        │  - submissions/my-app/manifest.json (thin manifest with nipkgFile + sha256)
        │  - optional screenshots for review
        │  - ready-to-commit branch
+  │ Alternative for source repos using sl-webapp-nipkg directly:
+  │  `sl-webapp-nipkg build --config nipkg.config.json --output-dir dist/nipkg --manifest`
        ▼
 3. Fork repo, push branch with
    submissions/my-app/ directory
