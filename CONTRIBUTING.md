@@ -90,20 +90,20 @@ Your plugin will be available in the Plugin Manager the next time users refresh 
 
 ## Requirements for submitted apps
 
-| Requirement     | Details                                                                                |
-| --------------- | -------------------------------------------------------------------------------------- |
-| Manifest        | `manifest.json` must contain `schemaVersion`, `nipkgFile`, and the correct `sha256`    |
-| Artifact source | Provide the `.nipkg` in the submission directory or provide both `sourceRepo` and `releaseTag` for a GitHub release asset matching `nipkgFile` |
-| Package metadata | The `.nipkg` must contain `Section`, `XB-Plugin`, `Maintainer`, `XB-SlPluginManagerLicense`, `XB-DisplayName`, and `XB-SlPluginManagerIcon` |
-| Content         | `.nipkg` must contain a valid webapp (`index.html` at root) or notebook (`.ipynb`)     |
-| CSP             | No external network calls outside SystemLink's own APIs                                |
-| Icon            | Must be embedded in the `.nipkg` as `XB-SlPluginManagerIcon`                           |
-| Description     | ≥ 20 characters                                                                        |
-| License         | Must be embedded in the package metadata (SPDX identifier or "Proprietary")            |
-| Checksums       | SHA256 must match `.nipkg` contents                                                    |
-| Version         | Valid semver (`MAJOR.MINOR.PATCH`)                                                     |
-| Size            | ≤ 100 MB                                                                               |
-| Naming          | Package name is first-come-first-served — CI rejects duplicates from different authors |
+| Requirement      | Details                                                                                                                                        |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Manifest         | `manifest.json` must contain `schemaVersion`, `nipkgFile`, and the correct `sha256`                                                            |
+| Artifact source  | Provide the `.nipkg` in the submission directory or provide both `sourceRepo` and `releaseTag` for a GitHub release asset matching `nipkgFile` |
+| Package metadata | The `.nipkg` must contain `Section`, `XB-Plugin`, `Maintainer`, `XB-SlPluginManagerLicense`, `XB-DisplayName`, and `XB-SlPluginManagerIcon`    |
+| Content          | `.nipkg` must contain a valid webapp (`index.html` at root) or notebook (`.ipynb`)                                                             |
+| CSP              | No external network calls outside SystemLink's own APIs                                                                                        |
+| Icon             | Must be embedded in the `.nipkg` as `XB-SlPluginManagerIcon`                                                                                   |
+| Description      | ≥ 20 characters                                                                                                                                |
+| License          | Must be embedded in the package metadata (SPDX identifier or "Proprietary")                                                                    |
+| Checksums        | SHA256 must match `.nipkg` contents                                                                                                            |
+| Version          | Valid semver (`MAJOR.MINOR.PATCH`)                                                                                                             |
+| Size             | ≤ 100 MB                                                                                                                                       |
+| Naming           | Package name is first-come-first-served — CI rejects duplicates from different authors                                                         |
 
 ## Packaging your app
 
