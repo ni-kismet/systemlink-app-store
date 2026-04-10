@@ -24,6 +24,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Configure git author
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -57,35 +62,6 @@ jobs:
           sed -i "s/export const PLUGIN_MANAGER_VERSION = '.*';/export const PLUGIN_MANAGER_VERSION = '${VERSION}';/" \
             webapp/src/app/models/plugin-manager.models.ts
 
-      - name: Commit version bump and sync
-        run: |
-          TARGET_BRANCH="${{ github.ref_name }}"
-
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add webapp/package.json webapp/CHANGELOG.md \
-                  webapp/nipkg.config.json \
-                  webapp/src/app/models/plugin-manager.models.ts \
-                  change/
-          if git diff --cached --quiet; then
-            echo "Nothing to commit."
-          else
-            git commit -m "chore: bump plugin manager to ${{ steps.version.outputs.version }} [skip ci]"
-            for attempt in 1 2 3; do
-              if git push origin HEAD:"$TARGET_BRANCH"; then
-                break
-              fi
-
-              if [ "$attempt" -eq 3 ]; then
-                echo "✗ Failed to push version bump after $attempt attempts." >&2
-                exit 1
-              fi
-
-              git fetch origin "$TARGET_BRANCH"
-              git rebase "origin/$TARGET_BRANCH"
-            done
-          fi
-
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -99,6 +75,18 @@ jobs:
       - name: Build webapp
         run: npm run build
         working-directory: webapp
+
+      - name: Commit release files locally
+        run: |
+          git add webapp/package.json webapp/CHANGELOG.md \
+                  webapp/nipkg.config.json \
+                  webapp/src/app/models/plugin-manager.models.ts \
+                  change/
+          if git diff --cached --quiet; then
+            echo "Release files already committed."
+          else
+            git commit -m "chore: bump plugin manager to ${{ steps.version.outputs.version }} [skip ci]"
+          fi
 
       - name: Package nipkg and submission manifest
         id: package
@@ -124,29 +112,15 @@ jobs:
 
       - name: Commit generated submission manifest
         run: |
-          TARGET_BRANCH="${{ github.ref_name }}"
-
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
           git add submissions/systemlink-plugin-manager/manifest.json
           if git diff --cached --quiet; then
             echo "Manifest already up to date."
           else
             git commit -m "chore: update submission manifest for ${{ steps.version.outputs.version }} [skip ci]"
-            for attempt in 1 2 3; do
-              if git push origin HEAD:"$TARGET_BRANCH"; then
-                break
-              fi
-
-              if [ "$attempt" -eq 3 ]; then
-                echo "✗ Failed to push submission manifest after $attempt attempts." >&2
-                exit 1
-              fi
-
-              git fetch origin "$TARGET_BRANCH"
-              git rebase "origin/$TARGET_BRANCH"
-            done
           fi
+
+      - name: Push release commits
+        run: bash scripts/git-push-with-retry.sh "${{ github.ref_name }}"
 
       - name: Create or update GitHub Release
         env:
@@ -185,6 +159,10 @@ jobs:
             gh release upload "$TAG" \
               "${{ steps.package.outputs.path }}" \
               --clobber
+            gh release edit "$TAG" \
+              --latest \
+              --title "Plugin Manager for SystemLink v${VERSION}" \
+              --notes "$CHANGELOG"
           else
             gh release create "$TAG" \
               "${{ steps.package.outputs.path }}" \
