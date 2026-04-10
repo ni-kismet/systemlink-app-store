@@ -154,7 +154,33 @@ jobs:
         run: |
           TAG="${{ steps.version.outputs.tag }}"
           VERSION="${{ steps.version.outputs.version }}"
-          CHANGELOG=$(npx beachball changelog --package systemlink-plugin-manager 2>/dev/null || echo "Release of Plugin Manager for SystemLink version ${VERSION}")
+          CHANGELOG=$(awk -v version="$VERSION" '
+            $0 == "## " version {
+              in_section = 1
+              next
+            }
+            in_section && /^## / {
+              exit
+            }
+            in_section {
+              if (!started && $0 == "") {
+                next
+              }
+              started = 1
+              lines[++count] = $0
+            }
+            END {
+              while (count > 0 && lines[count] == "") {
+                count--
+              }
+              for (i = 1; i <= count; i++) {
+                print lines[i]
+              }
+            }
+          ' webapp/CHANGELOG.md)
+          if [ -z "$CHANGELOG" ]; then
+            CHANGELOG="Release of Plugin Manager for SystemLink version ${VERSION}"
+          fi
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" \
               "${{ steps.package.outputs.path }}" \
