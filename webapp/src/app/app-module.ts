@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { APP_BASE_HREF } from '@angular/common';
 
 import {
+  NimbleAnchorModule,
   NimbleThemeProviderModule,
   NimbleButtonModule,
   NimbleTextFieldModule,
@@ -53,6 +54,7 @@ import { PermissionBannerComponent } from './shared/permission-banner.component'
     BrowserModule,
     FormsModule,
     AppRoutingModule,
+    NimbleAnchorModule,
     NimbleThemeProviderModule,
     NimbleLabelProviderCoreModule,
     NimbleButtonModule,

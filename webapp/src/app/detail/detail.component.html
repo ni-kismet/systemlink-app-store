@@ -80,10 +80,14 @@
         </dl>
 
         <div *ngIf="pkg.homepage" class="meta-link">
-          <a [href]="pkg.homepage" target="_blank" rel="noopener noreferrer">Homepage</a>
+          <nimble-anchor [href]="pkg.homepage" target="_blank" rel="noopener noreferrer">
+            Homepage
+          </nimble-anchor>
         </div>
         <div *ngIf="pkg.repo" class="meta-link">
-          <a [href]="pkg.repo" target="_blank" rel="noopener noreferrer">Source Repository</a>
+          <nimble-anchor [href]="pkg.repo" target="_blank" rel="noopener noreferrer">
+            Source Repository
+          </nimble-anchor>
         </div>
 
         <div *ngIf="installed" class="installed-info">
