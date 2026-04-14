@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { AppPackage, AppType, APP_TYPE_LABELS, WorkspaceInstallation } from '../models/plugin-manager.models';
 import { PluginManagerService } from '../services/plugin-manager.service';
+import { TelemetryService } from '../services/telemetry.service';
 import { compareSemver, isNewerVersion } from '../utils/semver';
 
 interface InstalledEntry {
@@ -37,6 +38,7 @@ export class InstalledComponent implements OnInit {
   constructor(
     private appStoreService: PluginManagerService,
     public router: Router,
+    private telemetry: TelemetryService,
   ) {}
 
   async ngOnInit(): Promise<void> {
@@ -77,16 +79,30 @@ export class InstalledComponent implements OnInit {
     if (!entry.catalogPkg || this.actionLoading) return;
     const feedId = entry.catalogPkg.sourceFeedId ?? this.feedId;
     if (!feedId) return;
+    const telemetryPackage = this.telemetry.packageFromAppPackage(entry.catalogPkg);
     this.actionLoading = entry.packageName;
     this.error = '';
+    this.telemetry.trackPackageAction('upgrade', 'started', telemetryPackage, {
+      source: 'installed_page',
+      workspaceCount: entry.installations.length,
+    });
     try {
       await this.appStoreService.upgradeAppAcrossWorkspaces(
         feedId,
         entry.catalogPkg,
         entry.installations,
       );
+      this.telemetry.trackPackageAction('upgrade', 'succeeded', telemetryPackage, {
+        source: 'installed_page',
+        workspaceCount: entry.installations.length,
+      });
       await this.loadInstalledApps(false);
     } catch (e: any) {
+      this.telemetry.trackPackageAction('upgrade', 'failed', telemetryPackage, {
+        source: 'installed_page',
+        workspaceCount: entry.installations.length,
+        errorMessage: e?.message ?? String(e),
+      });
       this.error = `Upgrade of ${entry.packageName} failed: ${e.message}`;
     } finally {
       this.actionLoading = null;
@@ -99,6 +115,10 @@ export class InstalledComponent implements OnInit {
     this.error = '';
 
     const upgradableEntries = this.entries.filter(entry => entry.upgradeAvailable && entry.catalogPkg);
+    this.telemetry.track('plugin_manager_upgrade_all_started', {
+      source: 'installed_page',
+      packageCount: upgradableEntries.length,
+    });
 
     try {
       for (const entry of upgradableEntries) {
@@ -111,8 +131,17 @@ export class InstalledComponent implements OnInit {
         );
       }
 
+      this.telemetry.track('plugin_manager_upgrade_all_succeeded', {
+        source: 'installed_page',
+        packageCount: upgradableEntries.length,
+      });
       await this.loadInstalledApps(false);
     } catch (e: any) {
+      this.telemetry.track('plugin_manager_upgrade_all_failed', {
+        source: 'installed_page',
+        packageCount: upgradableEntries.length,
+        errorMessage: e?.message ?? String(e),
+      });
       this.error = `Upgrade all failed: ${e.message ?? e}`;
     } finally {
       this.upgradingAll = false;
@@ -121,12 +150,34 @@ export class InstalledComponent implements OnInit {
 
   async uninstall(entry: InstalledEntry): Promise<void> {
     if (this.actionLoading) return;
+    const telemetryPackage = entry.catalogPkg
+      ? this.telemetry.packageFromAppPackage(entry.catalogPkg)
+      : {
+        packageName: entry.packageName,
+        displayName: entry.packageName,
+        version: entry.installations[0]?.version ?? null,
+        type: entry.installations[0]?.type ?? null,
+        sourceFeedId: entry.installations[0]?.feedId ?? null,
+      };
     this.actionLoading = entry.packageName;
     this.error = '';
+    this.telemetry.trackPackageAction('uninstall', 'started', telemetryPackage, {
+      source: 'installed_page',
+      workspaceCount: entry.installations.length,
+    });
     try {
       await this.appStoreService.uninstallAppAcrossWorkspaces(entry.installations);
+      this.telemetry.trackPackageAction('uninstall', 'succeeded', telemetryPackage, {
+        source: 'installed_page',
+        workspaceCount: entry.installations.length,
+      });
       await this.loadInstalledApps(false);
     } catch (e: any) {
+      this.telemetry.trackPackageAction('uninstall', 'failed', telemetryPackage, {
+        source: 'installed_page',
+        workspaceCount: entry.installations.length,
+        errorMessage: e?.message ?? String(e),
+      });
       this.error = `Uninstall of ${entry.packageName} failed: ${e.message}`;
     } finally {
       this.actionLoading = null;

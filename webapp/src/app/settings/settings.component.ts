@@ -2,6 +2,7 @@ import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
 import { Router } from '@angular/router';
 import { PLUGIN_MANAGER_VERSION, FeedConfig, DEFAULT_FEED_URL, NI_FEED_CONFIG_NAME } from '../models/plugin-manager.models';
 import { PluginManagerService } from '../services/plugin-manager.service';
+import { TelemetryService } from '../services/telemetry.service';
 
 @Component({
   selector: 'app-settings',
@@ -38,6 +39,7 @@ export class SettingsComponent implements OnInit {
   constructor(
     private appStoreService: PluginManagerService,
     public router: Router,
+    private telemetry: TelemetryService,
   ) {}
 
   async ngOnInit(): Promise<void> {
@@ -77,13 +79,30 @@ export class SettingsComponent implements OnInit {
     this.refreshingFeedId = feed.feedId;
     this.refreshResult = '';
     this.error = '';
+    this.telemetry.track('plugin_manager_feed_refresh_started', {
+      feedId: feed.feedId,
+      feedName: feed.name,
+      feedUrl: feed.url,
+    });
     try {
       const resourceIds = await this.appStoreService.checkForUpdates(feed.feedId);
       await this.appStoreService.applyUpdates(feed.feedId, resourceIds);
       this.refreshResult = resourceIds.length > 0
         ? `Feed "${feed.name}" refreshed successfully.`
         : `Feed "${feed.name}" is already up to date.`;
+      this.telemetry.track('plugin_manager_feed_refresh_succeeded', {
+        feedId: feed.feedId,
+        feedName: feed.name,
+        feedUrl: feed.url,
+        updateCount: resourceIds.length,
+      });
     } catch (e: any) {
+      this.telemetry.track('plugin_manager_feed_refresh_failed', {
+        feedId: feed.feedId,
+        feedName: feed.name,
+        feedUrl: feed.url,
+        errorMessage: e?.message ?? String(e),
+      });
       this.error = `Feed refresh failed: ${e.message}`;
     } finally {
       this.refreshingFeedId = null;
@@ -100,6 +119,11 @@ export class SettingsComponent implements OnInit {
       const sourceUrl = this.addFeedUrl.trim();
       const shouldReplicate = this.addFeedShouldReplicate;
       let feedId = '';
+      this.telemetry.track('plugin_manager_feed_add_started', {
+        feedName: name,
+        feedUrl: sourceUrl,
+        replicate: shouldReplicate,
+      });
 
       if (shouldReplicate) {
         const result = await this.appStoreService.replicateFeed(sourceUrl, name);
@@ -122,7 +146,19 @@ export class SettingsComponent implements OnInit {
       this.addFeedUrl = '';
       this.addFeedName = '';
       this.closeAddFeedDialog();
+      this.telemetry.track('plugin_manager_feed_add_succeeded', {
+        feedId,
+        feedName: name,
+        feedUrl: sourceUrl,
+        replicate: shouldReplicate,
+      });
     } catch (e: any) {
+      this.telemetry.track('plugin_manager_feed_add_failed', {
+        feedName: this.addFeedName.trim(),
+        feedUrl: this.addFeedUrl.trim(),
+        replicate: this.addFeedShouldReplicate,
+        errorMessage: e?.message ?? String(e),
+      });
       this.error = `Failed to add feed: ${e.message}`;
     } finally {
       this.addingFeed = false;
@@ -135,6 +171,7 @@ export class SettingsComponent implements OnInit {
     this.addFeedShouldReplicate = true;
     this.addFeedReplicationDefault = true;
     this.error = '';
+    this.telemetry.track('plugin_manager_feed_add_dialog_opened');
     (this.addFeedDialogEl?.nativeElement as any)?.show();
   }
 
@@ -163,6 +200,11 @@ export class SettingsComponent implements OnInit {
   openRemoveFeedDialog(feed: FeedConfig): void {
     this.feedPendingRemoval = feed;
     this.deleteReplicatedFeedOnRemove = true;
+    this.telemetry.track('plugin_manager_feed_remove_dialog_opened', {
+      feedId: feed.feedId,
+      feedName: feed.name,
+      feedUrl: feed.url,
+    });
     (this.removeFeedDialogEl?.nativeElement as any)?.show();
   }
 
@@ -179,6 +221,12 @@ export class SettingsComponent implements OnInit {
     this.error = '';
     this.removingFeed = true;
     const feedToRemove = this.feedPendingRemoval;
+    this.telemetry.track('plugin_manager_feed_remove_started', {
+      feedId: feedToRemove.feedId,
+      feedName: feedToRemove.name,
+      feedUrl: feedToRemove.url,
+      deleteReplicatedFeed: this.deleteReplicatedFeedOnRemove,
+    });
 
     try {
       if (this.deleteReplicatedFeedOnRemove && feedToRemove.feedId) {
@@ -193,7 +241,20 @@ export class SettingsComponent implements OnInit {
       this.feeds = updated;
       await this.refreshNiFeedAvailability();
       this.closeRemoveFeedDialog(true);
+      this.telemetry.track('plugin_manager_feed_remove_succeeded', {
+        feedId: feedToRemove.feedId,
+        feedName: feedToRemove.name,
+        feedUrl: feedToRemove.url,
+        deleteReplicatedFeed: this.deleteReplicatedFeedOnRemove,
+      });
     } catch (e: any) {
+      this.telemetry.track('plugin_manager_feed_remove_failed', {
+        feedId: feedToRemove.feedId,
+        feedName: feedToRemove.name,
+        feedUrl: feedToRemove.url,
+        deleteReplicatedFeed: this.deleteReplicatedFeedOnRemove,
+        errorMessage: e?.message ?? String(e),
+      });
       this.error = `Failed to remove feed: ${e.message}`;
     } finally {
       this.removingFeed = false;
@@ -210,6 +271,7 @@ export class SettingsComponent implements OnInit {
     this.addingNiFeed = true;
     this.error = '';
     this.refreshResult = '';
+    this.telemetry.track('plugin_manager_ni_feed_add_started');
     try {
       const { created, feedConfig } = await this.appStoreService.ensureOfficialFeedRegistered();
       this.feeds = await this.appStoreService.upsertFeedConfig(feedConfig);
@@ -217,7 +279,16 @@ export class SettingsComponent implements OnInit {
       this.refreshResult = created
         ? `Added "${feedConfig.name}".`
         : `Registered "${feedConfig.name}" using the existing replicated feed.`;
+      this.telemetry.track('plugin_manager_ni_feed_add_succeeded', {
+        feedId: feedConfig.feedId,
+        feedName: feedConfig.name,
+        feedUrl: feedConfig.url,
+        created,
+      });
     } catch (e: any) {
+      this.telemetry.track('plugin_manager_ni_feed_add_failed', {
+        errorMessage: e?.message ?? String(e),
+      });
       this.error = `Failed to add NI feed: ${e.message}`;
     } finally {
       this.addingNiFeed = false;

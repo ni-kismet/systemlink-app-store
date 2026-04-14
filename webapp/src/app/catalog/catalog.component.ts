@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { AppPackage, AppType, APP_TYPES, APP_TYPE_LABELS, InstalledApp, FeedConfig } from '../models/plugin-manager.models';
 import { PluginManagerService } from '../services/plugin-manager.service';
+import { TelemetryService } from '../services/telemetry.service';
 import { isNewerVersion } from '../utils/semver';
 
 @Component({
@@ -29,10 +30,13 @@ export class CatalogComponent implements OnInit {
   loading = true;
   error = '';
   installingPackage: string | null = null;
+  private searchTelemetryTimeout: ReturnType<typeof setTimeout> | null = null;
+  private lastTrackedSearchTerm = '';
 
   constructor(
     private appStoreService: PluginManagerService,
     private router: Router,
+    private telemetry: TelemetryService,
   ) {}
 
   async ngOnInit(): Promise<void> {
@@ -99,6 +103,49 @@ export class CatalogComponent implements OnInit {
     this.filteredPackages = result;
   }
 
+  onTypeChange(value: AppType | ''): void {
+    this.selectedType = value;
+    this.applyFilters();
+    this.telemetry.track('plugin_manager_catalog_filter_changed', {
+      filterName: 'type',
+      filterValue: value || 'all',
+      resultCount: this.filteredPackages.length,
+    });
+  }
+
+  onCategoryChange(value: string): void {
+    this.selectedCategory = value;
+    this.applyFilters();
+    this.telemetry.track('plugin_manager_catalog_filter_changed', {
+      filterName: 'category',
+      filterValue: value || 'all',
+      resultCount: this.filteredPackages.length,
+    });
+  }
+
+  onSearchTermChange(value: string): void {
+    this.searchTerm = value;
+    this.applyFilters();
+
+    if (this.searchTelemetryTimeout) {
+      clearTimeout(this.searchTelemetryTimeout);
+    }
+
+    this.searchTelemetryTimeout = setTimeout(() => {
+      const normalized = this.searchTerm.trim().toLowerCase();
+      if (normalized === this.lastTrackedSearchTerm) {
+        return;
+      }
+
+      this.lastTrackedSearchTerm = normalized;
+      this.telemetry.track('plugin_manager_catalog_search_changed', {
+        searchTerm: normalized,
+        searchLength: normalized.length,
+        resultCount: this.filteredPackages.length,
+      });
+    }, 400);
+  }
+
   isInstalled(pkg: AppPackage): boolean {
     return pkg.packageName in this.installedApps;
   }
@@ -120,8 +167,17 @@ export class CatalogComponent implements OnInit {
     const feedId = pkg.sourceFeedId ?? this.feedId;
     if (!feedId) { this.installingPackage = null; return; }
     const feedConfig = this.feedConfigs.find(f => f.feedId === feedId) ?? null;
+    const telemetryPackage = this.telemetry.packageFromAppPackage(pkg);
+    this.telemetry.trackPackageAction('install', 'started', telemetryPackage, {
+      source: 'catalog_card',
+      workspaceCount: 1,
+    });
     try {
       await this.appStoreService.installApp(feedId, pkg, feedConfig);
+      this.telemetry.trackPackageAction('install', 'succeeded', telemetryPackage, {
+        source: 'catalog_card',
+        workspaceCount: 1,
+      });
       // Reload installed status after install
       const currentWorkspace = await this.appStoreService.getWorkspace();
       const allInstallations = await this.appStoreService.listInstalledWebapps();
@@ -132,6 +188,11 @@ export class CatalogComponent implements OnInit {
         }
       }
     } catch (e: any) {
+      this.telemetry.trackPackageAction('install', 'failed', telemetryPackage, {
+        source: 'catalog_card',
+        workspaceCount: 1,
+        errorMessage: e?.message ?? String(e),
+      });
       this.error = `Install failed: ${e.message}`;
     } finally {
       this.installingPackage = null;

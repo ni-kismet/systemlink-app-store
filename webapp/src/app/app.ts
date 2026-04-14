@@ -2,6 +2,7 @@ import { Component, OnDestroy, OnInit } from '@angular/core';
 import { Router, NavigationEnd } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { filter } from 'rxjs/operators';
+import { TelemetryService } from './services/telemetry.service';
 
 @Component({
   selector: 'app-root',
@@ -15,16 +16,22 @@ export class App implements OnInit, OnDestroy {
   private themeObserver: MutationObserver | null = null;
   private routerSub?: Subscription;
 
-  constructor(private router: Router) {}
+  constructor(
+    private router: Router,
+    private telemetry: TelemetryService,
+  ) {}
 
   ngOnInit(): void {
     this.currentTheme = this.detectInitialTheme();
     this.watchParentTheme();
     this.activeTabId = this.tabIdFromUrl(this.router.url);
+    this.telemetry.trackRouteView(this.router.url);
     this.routerSub = this.router.events.pipe(
       filter(e => e instanceof NavigationEnd)
     ).subscribe(e => {
-      this.activeTabId = this.tabIdFromUrl((e as NavigationEnd).urlAfterRedirects);
+      const url = (e as NavigationEnd).urlAfterRedirects;
+      this.activeTabId = this.tabIdFromUrl(url);
+      this.telemetry.trackRouteView(url);
     });
   }
 

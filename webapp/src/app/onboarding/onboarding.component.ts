@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { DEFAULT_FEED_URL, FEED_NAME, NI_FEED_CONFIG_NAME } from '../models/plugin-manager.models';
 import { PluginManagerService } from '../services/plugin-manager.service';
+import { TelemetryService } from '../services/telemetry.service';
 
 @Component({
   selector: 'app-onboarding',
@@ -24,9 +25,13 @@ export class OnboardingComponent implements OnInit {
   constructor(
     private appStoreService: PluginManagerService,
     private router: Router,
+    private telemetry: TelemetryService,
   ) {}
 
   async ngOnInit(): Promise<void> {
+    this.telemetry.track('plugin_manager_onboarding_started', {
+      feedUrl: this.feedUrl,
+    });
     await this.checkForExistingFeed(this.feedUrl);
   }
 
@@ -42,6 +47,9 @@ export class OnboardingComponent implements OnInit {
     this.loading = true;
     this.error = '';
     this.showFeedConflict = false;
+    this.telemetry.track('plugin_manager_onboarding_feed_replicate_started', {
+      feedUrl: this.feedUrl.trim(),
+    });
     try {
       const sourceUrl = this.feedUrl.trim();
       const existingFeed = await this.appStoreService.findFeedBySourceUrl(sourceUrl).catch(() => null);
@@ -49,12 +57,21 @@ export class OnboardingComponent implements OnInit {
         this.existingFeedId = existingFeed.id;
         this.existingFeedName = existingFeed.name;
         this.showFeedConflict = true;
+        this.telemetry.track('plugin_manager_onboarding_feed_conflict_detected', {
+          feedUrl: sourceUrl,
+          existingFeedId: existingFeed.id,
+          existingFeedName: existingFeed.name,
+        });
         return;
       }
 
       const result = await this.appStoreService.replicateFeed(sourceUrl, this.getPreferredFeedName(sourceUrl));
       this.feedId = result.id ?? result.feedId ?? '';
       await this.saveMainFeedAndAdvance();
+      this.telemetry.track('plugin_manager_onboarding_feed_replicate_succeeded', {
+        feedId: this.feedId,
+        feedUrl: sourceUrl,
+      });
     } catch (e: any) {
       const msg = typeof e.message === 'string' ? e.message : '';
       // Detect "feed already exists" style errors and offer to use the existing feed.
@@ -64,12 +81,21 @@ export class OnboardingComponent implements OnInit {
           this.existingFeedId = existing.id;
           this.existingFeedName = existing.name;
           this.showFeedConflict = true;
+          this.telemetry.track('plugin_manager_onboarding_feed_conflict_detected', {
+            feedUrl: this.feedUrl.trim(),
+            existingFeedId: existing.id,
+            existingFeedName: existing.name,
+          });
         } else {
           this.error = `Feed replication failed: ${msg}`;
         }
       } else {
         this.error = `Feed replication failed: ${msg}`;
       }
+      this.telemetry.track('plugin_manager_onboarding_feed_replicate_failed', {
+        feedUrl: this.feedUrl.trim(),
+        errorMessage: msg,
+      });
     } finally {
       this.loading = false;
     }
@@ -80,10 +106,26 @@ export class OnboardingComponent implements OnInit {
     this.loading = true;
     this.error = '';
     this.showFeedConflict = false;
+    this.telemetry.track('plugin_manager_onboarding_use_existing_feed_started', {
+      existingFeedId: this.existingFeedId,
+      existingFeedName: this.existingFeedName,
+      feedUrl: this.feedUrl.trim(),
+    });
     try {
       this.feedId = this.existingFeedId;
       await this.saveMainFeedAndAdvance();
+      this.telemetry.track('plugin_manager_onboarding_use_existing_feed_succeeded', {
+        existingFeedId: this.feedId,
+        existingFeedName: this.existingFeedName,
+        feedUrl: this.feedUrl.trim(),
+      });
     } catch (e: any) {
+      this.telemetry.track('plugin_manager_onboarding_use_existing_feed_failed', {
+        existingFeedId: this.existingFeedId,
+        existingFeedName: this.existingFeedName,
+        feedUrl: this.feedUrl.trim(),
+        errorMessage: e?.message ?? String(e),
+      });
       this.error = `Failed to save feed configuration: ${e.message}`;
     } finally {
       this.loading = false;
@@ -95,13 +137,28 @@ export class OnboardingComponent implements OnInit {
     this.loading = true;
     this.error = '';
     this.showFeedConflict = false;
+    this.telemetry.track('plugin_manager_onboarding_replace_feed_started', {
+      existingFeedId: this.existingFeedId,
+      existingFeedName: this.existingFeedName,
+      feedUrl: this.feedUrl.trim(),
+    });
     try {
       await this.appStoreService.deleteReplicatedFeedIfExists(this.existingFeedId);
       const sourceUrl = this.feedUrl.trim();
       const result = await this.appStoreService.replicateFeed(sourceUrl, this.getPreferredFeedName(sourceUrl));
       this.feedId = result.id ?? result.feedId ?? '';
       await this.saveMainFeedAndAdvance();
+      this.telemetry.track('plugin_manager_onboarding_replace_feed_succeeded', {
+        feedId: this.feedId,
+        feedUrl: sourceUrl,
+      });
     } catch (e: any) {
+      this.telemetry.track('plugin_manager_onboarding_replace_feed_failed', {
+        existingFeedId: this.existingFeedId,
+        existingFeedName: this.existingFeedName,
+        feedUrl: this.feedUrl.trim(),
+        errorMessage: e?.message ?? String(e),
+      });
       this.error = `Failed to replace feed: ${e.message}`;
     } finally {
       this.loading = false;
@@ -122,6 +179,10 @@ export class OnboardingComponent implements OnInit {
   }
 
   goToCatalog(): void {
+    this.telemetry.track('plugin_manager_onboarding_completed', {
+      feedId: this.feedId,
+      feedUrl: this.feedUrl.trim(),
+    });
     this.router.navigate(['/catalog']);
   }
 

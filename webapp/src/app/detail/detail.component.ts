@@ -2,6 +2,7 @@ import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AppPackage, FeedConfig, InstalledApp, WorkspaceInfo, WorkspaceInstallation } from '../models/plugin-manager.models';
 import { PluginManagerService } from '../services/plugin-manager.service';
+import { TelemetryService } from '../services/telemetry.service';
 import { formatBytes } from '../utils/semver';
 import { isNewerVersion } from '../utils/semver';
 
@@ -47,6 +48,7 @@ export class AppDetailComponent implements OnInit {
     private route: ActivatedRoute,
     private appStoreService: PluginManagerService,
     private router: Router,
+    private telemetry: TelemetryService,
   ) {}
 
   async ngOnInit(): Promise<void> {
@@ -96,6 +98,10 @@ export class AppDetailComponent implements OnInit {
       this.activeScreenshot = this.pkg.screenshots[0] ?? null;
 
       this.refreshWorkspaceState(packageName, readableWorkspaces);
+      this.telemetry.trackPackageDetailView(this.telemetry.packageFromAppPackage(this.pkg), {
+        source: 'detail_page',
+        installedWorkspaceCount: this.workspaceInstallations.length,
+      });
     } catch (e: any) {
       this.error = e.message ?? 'Failed to load package details';
     } finally {
@@ -244,8 +250,21 @@ export class AppDetailComponent implements OnInit {
       : null;
     const toInstallIds = this.pendingWorkspaceIds.filter(id => !this.originalInstalledIds.has(id));
     const toUninstall = this.workspaceInstallations.filter(inst => !this.pendingWorkspaceIds.includes(inst.workspaceId));
+    const telemetryPackage = this.telemetry.packageFromAppPackage(this.pkg);
     this.actionLoading = true;
     this.error = '';
+    if (toInstallIds.length > 0) {
+      this.telemetry.trackPackageAction('install', 'started', telemetryPackage, {
+        source: this.isEditMode ? 'detail_workspace_editor' : 'detail_install_dialog',
+        workspaceCount: toInstallIds.length,
+      });
+    }
+    if (toUninstall.length > 0) {
+      this.telemetry.trackPackageAction('uninstall', 'started', telemetryPackage, {
+        source: 'detail_workspace_editor',
+        workspaceCount: toUninstall.length,
+      });
+    }
     try {
       if (toInstallIds.length > 0) {
         if (pkgType === 'dashboard' && this.isEditMode && this.workspaceInstallations.length > 0) {
@@ -268,10 +287,36 @@ export class AppDetailComponent implements OnInit {
       if (toUninstall.length > 0) {
         await this.appStoreService.uninstallAppAcrossWorkspaces(toUninstall);
       }
+      if (toInstallIds.length > 0) {
+        this.telemetry.trackPackageAction('install', 'succeeded', telemetryPackage, {
+          source: this.isEditMode ? 'detail_workspace_editor' : 'detail_install_dialog',
+          workspaceCount: toInstallIds.length,
+        });
+      }
+      if (toUninstall.length > 0) {
+        this.telemetry.trackPackageAction('uninstall', 'succeeded', telemetryPackage, {
+          source: 'detail_workspace_editor',
+          workspaceCount: toUninstall.length,
+        });
+      }
       await this.reloadWorkspaceState();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (this.installDialogEl?.nativeElement as any)?.close();
     } catch (e: any) {
+      if (toInstallIds.length > 0) {
+        this.telemetry.trackPackageAction('install', 'failed', telemetryPackage, {
+          source: this.isEditMode ? 'detail_workspace_editor' : 'detail_install_dialog',
+          workspaceCount: toInstallIds.length,
+          errorMessage: e?.message ?? String(e),
+        });
+      }
+      if (toUninstall.length > 0) {
+        this.telemetry.trackPackageAction('uninstall', 'failed', telemetryPackage, {
+          source: 'detail_workspace_editor',
+          workspaceCount: toUninstall.length,
+          errorMessage: e?.message ?? String(e),
+        });
+      }
       this.error = `Operation failed: ${e.message}`;
     } finally {
       this.actionLoading = false;
@@ -282,12 +327,26 @@ export class AppDetailComponent implements OnInit {
     if (!this.pkg || !this.installed || this.actionLoading) return;
     const feedId = this.pkg.sourceFeedId ?? this.feedId;
     if (!feedId) return;
+    const telemetryPackage = this.telemetry.packageFromAppPackage(this.pkg);
     this.actionLoading = true;
     this.error = '';
+    this.telemetry.trackPackageAction('upgrade', 'started', telemetryPackage, {
+      source: 'detail_page',
+      workspaceCount: 1,
+    });
     try {
       await this.appStoreService.upgradeApp(feedId, this.pkg, this.installed);
+      this.telemetry.trackPackageAction('upgrade', 'succeeded', telemetryPackage, {
+        source: 'detail_page',
+        workspaceCount: 1,
+      });
       await this.reloadWorkspaceState();
     } catch (e: any) {
+      this.telemetry.trackPackageAction('upgrade', 'failed', telemetryPackage, {
+        source: 'detail_page',
+        workspaceCount: 1,
+        errorMessage: e?.message ?? String(e),
+      });
       this.error = `Upgrade failed: ${e.message}`;
     } finally {
       this.actionLoading = false;
@@ -306,13 +365,27 @@ export class AppDetailComponent implements OnInit {
 
   async uninstall(): Promise<void> {
     if (!this.pkg || !this.workspaceInstallations.length || this.actionLoading) return;
+    const telemetryPackage = this.telemetry.packageFromAppPackage(this.pkg);
     this.actionLoading = true;
     this.error = '';
     this.closeUninstallDialog();
+    this.telemetry.trackPackageAction('uninstall', 'started', telemetryPackage, {
+      source: 'detail_uninstall_dialog',
+      workspaceCount: this.workspaceInstallations.length,
+    });
     try {
       await this.appStoreService.uninstallAppAcrossWorkspaces(this.workspaceInstallations);
+      this.telemetry.trackPackageAction('uninstall', 'succeeded', telemetryPackage, {
+        source: 'detail_uninstall_dialog',
+        workspaceCount: this.workspaceInstallations.length,
+      });
       await this.reloadWorkspaceState();
     } catch (e: any) {
+      this.telemetry.trackPackageAction('uninstall', 'failed', telemetryPackage, {
+        source: 'detail_uninstall_dialog',
+        workspaceCount: this.workspaceInstallations.length,
+        errorMessage: e?.message ?? String(e),
+      });
       this.error = `Uninstall failed: ${e.message}`;
     } finally {
       this.actionLoading = false;

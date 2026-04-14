@@ -1,12 +1,12 @@
 <app-permission-banner [hasPermission]="hasPermission"></app-permission-banner>
 
 <div class="catalog-toolbar">
-  <nimble-select [(ngModel)]="selectedType" (ngModelChange)="applyFilters()">
+  <nimble-select [(ngModel)]="selectedType" (ngModelChange)="onTypeChange($event)">
     <nimble-list-option [value]="''">All Types</nimble-list-option>
     <nimble-list-option *ngFor="let t of appTypes" [value]="t">{{ appTypeLabels[t] }}</nimble-list-option>
   </nimble-select>
 
-  <nimble-select [(ngModel)]="selectedCategory" (ngModelChange)="applyFilters()">
+  <nimble-select [(ngModel)]="selectedCategory" (ngModelChange)="onCategoryChange($event)">
     <nimble-list-option [value]="''">All Categories</nimble-list-option>
     <nimble-list-option *ngFor="let cat of categories" [value]="cat">{{ cat }}</nimble-list-option>
   </nimble-select>
@@ -14,7 +14,7 @@
   <nimble-text-field
     placeholder="Search apps…"
     [(ngModel)]="searchTerm"
-    (ngModelChange)="applyFilters()">
+    (ngModelChange)="onSearchTermChange($event)">
     <nimble-icon-magnifying-glass slot="start"></nimble-icon-magnifying-glass>
   </nimble-text-field>
 </div>
