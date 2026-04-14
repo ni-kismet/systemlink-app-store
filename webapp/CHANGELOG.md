@@ -1,8 +1,17 @@
 # Change Log - systemlink-plugin-manager
 
-<!-- This log was last generated on Wed, 08 Apr 2026 17:14:15 GMT and should not be manually modified. -->
+<!-- This log was last generated on Tue, 14 Apr 2026 15:58:07 GMT and should not be manually modified. -->
 
 <!-- Start content -->
+
+## 1.1.1
+
+Tue, 14 Apr 2026 15:58:07 GMT
+
+### Patches
+
+- `systemlink-plugin-manager`
+  - fix: add telemetry (1458528+fredvisser@users.noreply.github.com)
 
 ## 1.1.0
 
