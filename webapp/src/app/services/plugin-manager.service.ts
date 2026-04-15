@@ -633,6 +633,77 @@ export class PluginManagerService {
     if (error) throw new Error(`Failed to tag Plugin Manager webapp: ${JSON.stringify(error)}`);
   }
 
+  /**
+  * Ensure the current Plugin Manager webapp is tagged as installed for one of
+  * the configured feeds. Returns true when an update was applied.
+   */
+  async ensureOwnWebappTagged(preferredFeed?: FeedConfig | null): Promise<boolean> {
+    const ownId = this.getOwnWebappId();
+    if (!ownId) return false;
+
+    const { data: current } = await sdkGetWebapp({
+      client: this.webAppClient,
+      path: { id: ownId },
+    });
+    if (!current) return false;
+
+    const existing = ((current as any)?.properties ?? {}) as Record<string, string>;
+    const configuredFeeds = preferredFeed ? [preferredFeed] : await this.loadFeedConfigs();
+    if (configuredFeeds.length === 0) return false;
+
+    const existingFeedId = this.readProperty(
+      existing,
+      SL_PLUGIN_MANAGER_PROP_FEED_ID,
+      LEGACY_APPSTORE_PROP_FEED_ID,
+    );
+    const existingFeedUrl = this.readProperty(
+      existing,
+      SL_PLUGIN_MANAGER_PROP_FEED_URL,
+      LEGACY_APPSTORE_PROP_FEED_URL,
+    );
+
+    const targetFeed = configuredFeeds.find(feed =>
+      (!!existingFeedId && feed.feedId === existingFeedId) ||
+      (!!existingFeedUrl && this.isSameFeedUrl(feed.url, existingFeedUrl))
+    ) ?? configuredFeeds[0];
+
+    const packageName = this.readProperty(
+      existing,
+      SL_PLUGIN_MANAGER_PROP_PACKAGE,
+      LEGACY_APPSTORE_PROP_PACKAGE,
+    );
+    const version = this.readProperty(
+      existing,
+      SL_PLUGIN_MANAGER_PROP_VERSION,
+      LEGACY_APPSTORE_PROP_VERSION,
+    );
+    const resourceType = this.readProperty(
+      existing,
+      SL_PLUGIN_MANAGER_PROP_TYPE,
+      LEGACY_APPSTORE_PROP_TYPE,
+    );
+    const installedAt = this.readProperty(
+      existing,
+      SL_PLUGIN_MANAGER_PROP_INSTALLED_AT,
+      LEGACY_APPSTORE_PROP_INSTALLED_AT,
+    );
+
+    const alreadyTagged =
+      packageName === PLUGIN_MANAGER_PACKAGE_NAME &&
+      version === PLUGIN_MANAGER_VERSION &&
+      resourceType.toLowerCase() === 'webapp' &&
+      targetFeed.feedId === existingFeedId &&
+      this.isSameFeedUrl(targetFeed.url, existingFeedUrl) &&
+      !!installedAt;
+
+    if (alreadyTagged) {
+      return false;
+    }
+
+    await this.tagOwnWebapp(targetFeed.feedId, targetFeed.url);
+    return true;
+  }
+
   // ── Installed resource discovery ────────────────────────────────
 
   /**

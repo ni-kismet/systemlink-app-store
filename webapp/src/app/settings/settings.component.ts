@@ -87,6 +87,7 @@ export class SettingsComponent implements OnInit {
     try {
       const resourceIds = await this.appStoreService.checkForUpdates(feed.feedId);
       await this.appStoreService.applyUpdates(feed.feedId, resourceIds);
+      await this.appStoreService.ensureOwnWebappTagged(feed);
       this.refreshResult = resourceIds.length > 0
         ? `Feed "${feed.name}" refreshed successfully.`
         : `Feed "${feed.name}" is already up to date.`;

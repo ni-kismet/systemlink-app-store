@@ -3,6 +3,7 @@ import { Router, NavigationEnd } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { filter } from 'rxjs/operators';
 import { TelemetryService } from './services/telemetry.service';
+import { PluginManagerService } from './services/plugin-manager.service';
 
 @Component({
   selector: 'app-root',
@@ -19,11 +20,13 @@ export class App implements OnInit, OnDestroy {
   constructor(
     private router: Router,
     private telemetry: TelemetryService,
+    private pluginManagerService: PluginManagerService,
   ) {}
 
   ngOnInit(): void {
     this.currentTheme = this.detectInitialTheme();
     this.watchParentTheme();
+    void this.ensureOwnWebappTag();
     this.activeTabId = this.tabIdFromUrl(this.router.url);
     this.telemetry.trackRouteView(this.router.url);
     this.routerSub = this.router.events.pipe(
@@ -44,6 +47,14 @@ export class App implements OnInit, OnDestroy {
     if (url.startsWith('/installed')) return 'installed';
     if (url.startsWith('/settings')) return 'settings';
     return 'catalog';
+  }
+
+  private async ensureOwnWebappTag(): Promise<void> {
+    try {
+      await this.pluginManagerService.ensureOwnWebappTagged();
+    } catch (error) {
+      console.warn('Failed to ensure Plugin Manager self-tag on launch:', error);
+    }
   }
 
   private detectInitialTheme(): 'light' | 'dark' {
