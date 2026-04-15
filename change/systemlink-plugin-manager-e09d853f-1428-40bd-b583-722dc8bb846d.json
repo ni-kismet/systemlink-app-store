@@ -1,7 +1,0 @@
-{
-  "type": "patch",
-  "comment": "Ensure webapp is tagged as \"installed\"",
-  "packageName": "systemlink-plugin-manager",
-  "email": "1458528+fredvisser@users.noreply.github.com",
-  "dependentChangeType": "patch"
-}
