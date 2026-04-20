@@ -26,6 +26,7 @@ import {
   NimbleAnchorTabModule,
   NimbleIconMagnifyingGlassModule,
 } from '@ni/nimble-angular';
+import { NimbleChipModule } from '@ni/nimble-angular/chip';
 import { NimbleLabelProviderCoreModule } from '@ni/nimble-angular/label-provider/core';
 import { NimbleCardModule } from '@ni/nimble-angular/card';
 
@@ -58,6 +59,7 @@ import { PermissionBannerComponent } from './shared/permission-banner.component'
     NimbleThemeProviderModule,
     NimbleLabelProviderCoreModule,
     NimbleButtonModule,
+    NimbleChipModule,
     NimbleTextFieldModule,
     NimbleSelectModule,
     NimbleListOptionModule,

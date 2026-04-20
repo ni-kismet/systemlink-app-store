@@ -3,12 +3,18 @@
 
 /* Theme-independent aliases: fonts and spacing (defined on :root, do not change with theme). */
 :root {
+  --sl-app-font-family-sans: 'Source Sans Pro', 'Source Sans Pro Fallback', sans-serif;
   --sl-app-font-body: var(--ni-nimble-body-font);
   --sl-app-font-body-emphasized: var(--ni-nimble-body-emphasized-font);
+  --sl-app-font-body-plus-1: var(--ni-nimble-body-plus-1-font);
+  --sl-app-font-body-plus-1-emphasized: var(--ni-nimble-body-plus-1-emphasized-font);
+  --sl-app-font-subtitle: var(--ni-nimble-subtitle-font);
+  --sl-app-font-subtitle-emphasized: var(--ni-nimble-control-label-font-weight) var(--ni-nimble-subtitle-font-size) / var(--ni-nimble-subtitle-font-line-height) var(--ni-nimble-subtitle-font-family);
   --sl-app-font-title: var(--ni-nimble-title-font);
   --sl-app-font-title-plus-1: var(--ni-nimble-title-plus-1-font);
   --sl-app-font-control-label: var(--ni-nimble-control-label-font);
   --sl-app-font-group-header: var(--ni-nimble-group-header-font);
+  --sl-app-font-mono-small: 400 0.8125rem/1.4 ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, monospace;
 
   --sl-app-space-1: var(--ni-nimble-small-padding, 4px);
   --sl-app-space-2: var(--ni-nimble-medium-padding, 8px);
@@ -21,6 +27,11 @@ html,
 body {
   margin: 0;
   min-height: 100%;
+}
+
+body,
+nimble-theme-provider {
+  font-family: var(--sl-app-font-family-sans);
 }
 
 * {

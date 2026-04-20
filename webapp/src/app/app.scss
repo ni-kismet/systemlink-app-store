@@ -23,6 +23,10 @@ nimble-theme-provider {
   --sl-app-color-success: var(--ni-nimble-pass-color);
   --sl-app-shadow-1: var(--ni-nimble-elevation-1-box-shadow);
   --sl-app-shadow-2: var(--ni-nimble-elevation-2-box-shadow);
+  --sl-app-shadow-hover: 0 14px 32px rgba(0, 0, 0, 0.32),
+    0 4px 12px rgba(0, 0, 0, 0.2),
+    0 0 0 1px color-mix(in srgb, var(--sl-app-color-border-strong) 55%, transparent);
+  --sl-app-radius-tile: 8px;
 }
 
 .app-shell {

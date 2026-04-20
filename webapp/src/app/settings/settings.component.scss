@@ -38,9 +38,10 @@ h2 {
 
 .settings-section {
   padding: var(--sl-app-space-6) 0;
+  font: var(--sl-app-font-subtitle);
 
   & + .settings-section {
-    border-top: 1px solid var(--sl-app-color-border);
+    border-top: 2px solid var(--sl-app-color-border);
   }
 
   h3 {
@@ -74,8 +75,8 @@ h2 {
   gap: var(--sl-app-space-4);
   padding: var(--sl-app-space-4);
   margin-bottom: var(--sl-app-space-3);
-  border: 1px solid var(--sl-app-color-border);
-  border-radius: var(--sl-app-space-1);
+  border: none;
+  border-radius: var(--sl-app-radius-tile);
   background: var(--sl-app-color-surface);
 }
 
@@ -86,8 +87,8 @@ h2 {
   gap: var(--sl-app-space-4);
   padding: var(--sl-app-space-4);
   margin-bottom: var(--sl-app-space-3);
-  border: 1px solid var(--sl-app-color-border);
-  border-radius: var(--sl-app-space-1);
+  border: none;
+  border-radius: var(--sl-app-radius-tile);
   background: var(--sl-app-color-surface-alt);
 
   h4 {
@@ -123,24 +124,26 @@ h2 {
   grid-template-columns: 7.5rem 1fr;
   gap: var(--sl-app-space-1) var(--sl-app-space-4);
   margin: 0 0 var(--sl-app-space-3);
+  font: var(--sl-app-font-subtitle);
 
   dt {
     color: var(--sl-app-color-text-muted);
-    font: var(--sl-app-font-control-label);
+    font: var(--sl-app-font-subtitle-emphasized);
+    line-height: 1.4;
     padding-top: 2px; // align baseline with dd
   }
 
   dd {
     margin: 0;
     word-break: break-word;
-    font: var(--sl-app-font-body);
+    font: inherit;
+    line-height: 1.4;
     color: var(--sl-app-color-text);
   }
 }
 
 .mono {
-  font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, monospace;
-  font-size: 0.8125rem;
+  font: var(--sl-app-font-mono-small);
 }
 
 // ── Add-feed form ────────────────────────────────────────────

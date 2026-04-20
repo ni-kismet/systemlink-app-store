@@ -6,18 +6,17 @@
 .app-card {
   display: flex;
   flex: 1;
-  gap: var(--sl-app-space-3);
+  gap: 16px;
   padding: var(--sl-app-space-4);
-  border: 1px solid var(--ni-nimble-card-border-color);
-  border-radius: var(--sl-app-space-1);
+  border: none;
+  border-radius: var(--sl-app-radius-tile);
   cursor: pointer;
   transition: box-shadow var(--ni-nimble-medium-delay, 0.15s) ease,
               border-color var(--ni-nimble-medium-delay, 0.15s) ease;
   background: var(--ni-nimble-section-background-color);
 
   &:hover {
-    box-shadow: var(--ni-nimble-elevation-2-box-shadow, 0 2px 8px rgba(0, 0, 0, 0.12));
-    border-color: var(--ni-nimble-border-hover-color);
+    box-shadow: var(--sl-app-shadow-hover);
   }
 }
 
@@ -31,7 +30,7 @@
   width: 3rem;
   height: 3rem;
   object-fit: contain;
-  border-radius: var(--sl-app-space-1);
+  border-radius: var(--sl-app-radius-tile);
 }
 
 .icon-placeholder {
@@ -43,7 +42,7 @@
   font: var(--sl-app-font-title);
   color: var(--ni-nimble-button-primary-font-color);
   background: var(--ni-nimble-button-fill-primary-color);
-  border-radius: var(--sl-app-space-1);
+  border-radius: var(--sl-app-radius-tile);
 }
 
 .card-body {
@@ -61,7 +60,8 @@
 }
 
 .card-title {
-  font: var(--sl-app-font-body-emphasized);
+  font: var(--sl-app-font-body-plus-1-emphasized);
+  line-height: 1.25;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -69,24 +69,22 @@
 
 .upgrade-badge,
 .installed-badge {
-  font: var(--sl-app-font-control-label);
+  font: var(--sl-app-font-subtitle-emphasized);
+  line-height: 1.2;
   padding: 1px 6px;
   border-radius: 3px;
   white-space: nowrap;
+  border: 1px solid color-mix(in srgb, var(--sl-app-color-success) 55%, white);
+  background: color-mix(in srgb, var(--sl-app-color-success) 16%, white);
+  color: color-mix(in srgb, var(--sl-app-color-success) 80%, black);
 }
 
 .upgrade-badge {
-  background: var(--ni-nimble-button-fill-primary-color);
-  color: var(--ni-nimble-button-primary-font-color);
-}
-
-.installed-badge {
-  background: var(--ni-nimble-header-background-color);
-  color: var(--ni-nimble-body-font-color);
 }
 
 .card-author {
-  font: var(--sl-app-font-control-label);
+  font: var(--sl-app-font-subtitle);
+  line-height: 1.3;
   color: var(--ni-nimble-placeholder-font-color);
 }
 

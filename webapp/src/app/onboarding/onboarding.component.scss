@@ -11,8 +11,8 @@
   width: 100%;
   max-width: 44rem;
   padding: var(--sl-app-space-6);
-  border: 1px solid var(--sl-app-color-border);
-  border-radius: var(--sl-app-space-1);
+  border: none;
+  border-radius: var(--sl-app-radius-tile);
   background: var(--sl-app-color-surface);
   box-shadow: var(--sl-app-shadow-1);
 
@@ -46,16 +46,15 @@
 .step {
   margin-bottom: var(--sl-app-space-6);
   padding: var(--sl-app-space-4);
-  border: 1px solid var(--sl-app-color-border);
-  border-radius: var(--sl-app-space-1);
+  border: none;
+  border-radius: var(--sl-app-radius-tile);
   opacity: 0.6;
   transition: opacity var(--ni-nimble-medium-delay, 0.15s) ease;
   background: var(--sl-app-color-surface);
 
   &.active {
     opacity: 1;
-    border-color: var(--sl-app-color-accent);
-    box-shadow: var(--sl-app-shadow-1);
+    box-shadow: 0 0 0 1px var(--sl-app-color-accent), var(--sl-app-shadow-1);
   }
 
   &.done {

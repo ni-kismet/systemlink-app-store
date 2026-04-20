@@ -116,7 +116,7 @@
   min-height: 18rem;
   padding: var(--sl-app-space-3);
   border: 1px solid var(--sl-app-color-border);
-  border-radius: var(--sl-app-space-2);
+  border-radius: var(--sl-app-radius-tile);
   background: var(--ni-nimble-section-background-color);
 }
 
@@ -125,7 +125,7 @@
   max-width: 100%;
   max-height: 28rem;
   object-fit: contain;
-  border-radius: var(--sl-app-space-1);
+  border-radius: var(--sl-app-radius-tile);
 }
 
 .screenshot-thumbnails {
@@ -138,7 +138,7 @@
   width: 7rem;
   padding: 0;
   border: 1px solid var(--sl-app-color-border);
-  border-radius: var(--sl-app-space-1);
+  border-radius: var(--sl-app-radius-tile);
   background: var(--ni-nimble-section-background-color);
   cursor: pointer;
   overflow: hidden;
@@ -231,7 +231,7 @@
   flex-direction: column;
   margin-top: var(--sl-app-space-3);
   border: 1px solid var(--sl-app-color-border);
-  border-radius: var(--sl-app-space-1);
+  border-radius: var(--sl-app-radius-tile);
   overflow: hidden;
 }
 

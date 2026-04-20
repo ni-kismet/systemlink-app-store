@@ -22,7 +22,7 @@
         <span class="pkg-version">v{{ pkg.version }}</span>
       </div>
       <div class="header-actions" *ngIf="hasPermission">
-        <nimble-button *ngIf="installableWorkspaces.length > 0 || installedSomewhere" appearance="outline" (click)="openInstallDialog()" [disabled]="actionLoading">
+        <nimble-button *ngIf="installableWorkspaces.length > 0 || installedSomewhere" appearance="block" appearance-variant="accent" (click)="openInstallDialog()" [disabled]="actionLoading">
           {{ installedSomewhere ? 'Edit Workspaces' : 'Install' }}
         </nimble-button>
         <nimble-button *ngIf="installed && upgradeAvailable" appearance="outline" (click)="upgrade()" [disabled]="actionLoading">

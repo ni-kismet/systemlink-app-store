@@ -35,19 +35,18 @@
 .installed-row {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: stretch;
   gap: var(--sl-app-space-3);
   padding: var(--sl-app-space-3) var(--sl-app-space-4);
-  border: 1px solid var(--ni-nimble-card-border-color);
-  border-radius: var(--sl-app-space-1);
+  border: none;
+  border-radius: var(--sl-app-radius-tile);
   cursor: pointer;
   transition: box-shadow var(--ni-nimble-medium-delay, 0.15s) ease,
               border-color var(--ni-nimble-medium-delay, 0.15s) ease;
   background: var(--ni-nimble-section-background-color);
 
   &:hover {
-    box-shadow: var(--ni-nimble-elevation-2-box-shadow, 0 2px 8px rgba(0, 0, 0, 0.12));
-    border-color: var(--ni-nimble-border-hover-color);
+    box-shadow: var(--sl-app-shadow-hover);
   }
 }
 
@@ -84,27 +83,17 @@
   margin-top: var(--sl-app-space-2);
 }
 
-.workspace-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  border: 1px solid var(--sl-app-color-border);
-  border-radius: 999px;
+.workspace-chip {
+  height: 24px;
   font: var(--sl-app-font-control-label);
-  color: var(--sl-app-color-text-muted);
-  background: var(--sl-app-color-surface-alt);
-}
-
-.workspace-pill.current {
-  color: var(--sl-app-color-accent);
-  border-color: color-mix(in srgb, var(--sl-app-color-accent) 40%, var(--sl-app-color-border));
 }
 
 .row-actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--sl-app-space-2);
+  margin-left: auto;
+  align-self: flex-end;
 }
 
 .type-group {
@@ -125,5 +114,11 @@
   .installed-row {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .row-actions {
+    margin-left: 0;
+    align-self: stretch;
+    justify-content: flex-end;
   }
 }

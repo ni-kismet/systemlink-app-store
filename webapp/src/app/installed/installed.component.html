@@ -42,25 +42,26 @@
             {{ entry.installations[0].type }} · {{ getWorkspaceSummary(entry) }} · Last activity {{ getLastActivity(entry) | date:'mediumDate' }}
           </span>
           <div class="workspace-list">
-            <span *ngFor="let installation of entry.installations" class="workspace-pill" [class.current]="installation.isCurrentWorkspace">
+            <nimble-chip *ngFor="let installation of entry.installations" class="workspace-chip" [appearance]="installation.isCurrentWorkspace ? 'outline' : 'block'">
               {{ installation.workspaceName }}
               <span *ngIf="installation.isCurrentWorkspace">(current)</span>
-            </span>
+            </nimble-chip>
           </div>
         </div>
         <div class="row-actions" *ngIf="hasPermission">
-          <nimble-button
-            *ngIf="entry.upgradeAvailable"
-            appearance="outline"
-            (click)="upgrade(entry); $event.stopPropagation()"
-            [disabled]="actionLoading === entry.packageName">
-            Upgrade
-          </nimble-button>
           <nimble-button
             appearance="ghost"
             (click)="uninstall(entry); $event.stopPropagation()"
             [disabled]="actionLoading === entry.packageName">
             Uninstall All
+          </nimble-button>
+          <nimble-button
+            *ngIf="entry.upgradeAvailable"
+            appearance="outline"
+            appearance-variant="accent"
+            (click)="upgrade(entry); $event.stopPropagation()"
+            [disabled]="actionLoading === entry.packageName">
+            Upgrade
           </nimble-button>
         </div>
       </div>
