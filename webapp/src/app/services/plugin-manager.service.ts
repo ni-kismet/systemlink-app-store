@@ -24,14 +24,14 @@ import {
 // ── SDK imports ───────────────────────────────────────────────
 import { createClient as createFeedsClient, createConfig as createFeedsConfig } from '@ni/systemlink-clients-ts/feeds/client';
 import {
-  getNifeedV1Feeds,
-  getNifeedV1FeedsByFeedIdPackages,
-  getNifeedV1FeedUpdatesByUpdateDescriptorListId,
-  getNifeedV1JobsByJobId,
-  postNifeedV1ReplicateFeed,
-  postNifeedV1FeedsByFeedIdApplyUpdates,
-  postNifeedV1FeedsByFeedIdCheckForUpdates,
-  deleteNifeedV1FeedsByFeedId,
+  applyUpdatesForFeed,
+  checkFeedForUpdates,
+  deleteFeed,
+  getJob,
+  getUpdateDescriptors,
+  queryFeeds,
+  queryPackagesForFeed,
+  replicateFeed,
 } from '@ni/systemlink-clients-ts/feeds';
 import type { ApplyUpdateDescriptor, Package } from '@ni/systemlink-clients-ts/feeds';
 import { createClient as createUserClient, createConfig as createUserConfig } from '@ni/systemlink-clients-ts/user/client';
@@ -156,7 +156,7 @@ export class PluginManagerService {
   }
 
   private async listFeeds(): Promise<any[]> {
-    const { data, error } = await getNifeedV1Feeds({ client: this.feedsClient });
+    const { data, error } = await queryFeeds({ client: this.feedsClient });
     if (error) throw new Error(`Failed to list feeds: ${JSON.stringify(error)}`);
     return data?.feeds ?? [];
   }
@@ -228,15 +228,15 @@ export class PluginManagerService {
   * Reads first-class fields from metadata.* and custom Plugin Manager fields from
    * metadata.attributes, per the feed format spec. */
   async listPackages(feedId: string): Promise<AppPackage[]> {
-    const { data, error } = await getNifeedV1FeedsByFeedIdPackages({
+    const { data, error } = await queryPackagesForFeed({
       client: this.feedsClient,
       path: { feedId },
     });
     if (error) throw new Error(`Failed to list packages: ${JSON.stringify(error)}`);
 
     const packages = (data?.packages ?? [])
-      .filter(p => this.isUserVisibleWebappResource(p))
-      .map(p => ({ ...this.mapPackageResource(p), sourceFeedId: feedId }));
+      .filter((pkg: Package) => this.isUserVisibleWebappResource(pkg))
+      .map((pkg: Package) => ({ ...this.mapPackageResource(pkg), sourceFeedId: feedId }));
 
     return this.selectLatestPackages(packages);
   }
@@ -275,7 +275,7 @@ export class PluginManagerService {
 
   /** Replicate a feed from a remote URL. */
   async replicateFeed(feedUrl: string, name: string = FEED_NAME): Promise<any> {
-    const { data, error } = await postNifeedV1ReplicateFeed({
+    const { data, error } = await replicateFeed({
       client: this.feedsClient,
       body: {
         name,
@@ -289,7 +289,7 @@ export class PluginManagerService {
 
   /** Delete a replicated feed by ID. */
   async deleteReplicatedFeed(feedId: string): Promise<void> {
-    const { error } = await deleteNifeedV1FeedsByFeedId({
+    const { error } = await deleteFeed({
       client: this.feedsClient,
       path: { feedId },
     });
@@ -316,7 +316,7 @@ export class PluginManagerService {
   private async waitForFeedJob(jobId: string, action: string): Promise<any> {
     for (let attempt = 0; attempt < FEED_JOB_POLL_ATTEMPTS; attempt++) {
       await new Promise(resolve => setTimeout(resolve, FEED_JOB_POLL_DELAY_MS));
-      const { data, error } = await getNifeedV1JobsByJobId({
+      const { data, error } = await getJob({
         client: this.feedsClient,
         path: { jobId },
       });
@@ -335,7 +335,7 @@ export class PluginManagerService {
   /** Trigger a check-for-updates job and poll until it completes.
    * Returns the list of feed-update resource IDs found (may be empty). */
   async checkForUpdates(feedId: string): Promise<string[]> {
-    const { data, error } = await postNifeedV1FeedsByFeedIdCheckForUpdates({
+    const { data, error } = await checkFeedForUpdates({
       client: this.feedsClient,
       path: { feedId },
     });
@@ -357,7 +357,7 @@ export class PluginManagerService {
     // Collapse duplicate package URIs across update lists so we only enqueue each import once.
     const descriptorsByUri = new Map<string, ApplyUpdateDescriptor>();
     for (const updateId of resourceIds) {
-      const { data, error } = await getNifeedV1FeedUpdatesByUpdateDescriptorListId({
+      const { data, error } = await getUpdateDescriptors({
         client: this.feedsClient,
         path: { updateDescriptorListId: updateId },
       });
@@ -376,7 +376,7 @@ export class PluginManagerService {
 
     for (let start = 0; start < allDescriptors.length; start += MAX_APPLY_UPDATE_DESCRIPTORS) {
       const batch = allDescriptors.slice(start, start + MAX_APPLY_UPDATE_DESCRIPTORS);
-      const { data, error } = await postNifeedV1FeedsByFeedIdApplyUpdates({
+      const { data, error } = await applyUpdatesForFeed({
         client: this.feedsClient,
         path: { feedId },
         query: { ignoreImportErrors: true },
