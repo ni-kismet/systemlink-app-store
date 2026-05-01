@@ -1,0 +1,8 @@
+{
+  "nipkgFile": "ni-labs-asset-calibration-alarms-notification_0.1.0_all.nipkg",
+  "releaseTag": "ni-labs-asset-calibration-alarms-notification-v0.1.0",
+  "schemaVersion": 2,
+  "sha256": "b9cf5a3fd48de5fb6abae275e577365ba67bf0091729c0e2ab70c406894d03f7",
+  "sourceCommit": "529ff6c14857c0f55b9988699adb71d866597c1a",
+  "sourceRepo": "ni-kismet/systemlink-plugins-ni-labs"
+}
