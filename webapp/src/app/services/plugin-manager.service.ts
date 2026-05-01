@@ -939,6 +939,7 @@ export class PluginManagerService {
     workspace: string,
   ): Promise<void> {
     const nipkgBlob = await this.downloadPackageFile(feedId, this.extractFileName(pkg.filename));
+    const notebookName = this.ensureNotebookFileName(pkg.displayName);
 
     // Extract the .ipynb notebook file from the nipkg archive.
     const notebookContent = await extractFirstMatch(
@@ -948,7 +949,7 @@ export class PluginManagerService {
 
     // Build metadata with all Plugin Manager properties so the notebook is self-describing.
     const properties = this.buildPluginManagerProperties(pkg, feedConfig);
-    const metadata = { name: pkg.displayName, workspace, properties };
+    const metadata = { name: notebookName, workspace, properties };
 
     const formData = new FormData();
     formData.append(
@@ -958,7 +959,7 @@ export class PluginManagerService {
     formData.append(
       'content',
       new Blob([notebookContent], { type: 'application/octet-stream' }),
-      `${pkg.packageName}.ipynb`,
+      notebookName,
     );
 
     const res = await fetch(`${this.origin}/ninotebook/v1/notebook`, {
@@ -1077,8 +1078,10 @@ export class PluginManagerService {
   /** Upgrade a notebook: replace content and update version in properties. */
   private async upgradeNotebook(notebookId: string, pkg: AppPackage, nipkgBlob: Blob): Promise<void> {
     const notebookContent = await extractFirstMatch(nipkgBlob, p => p.endsWith('.ipynb'));
+    const notebookName = this.ensureNotebookFileName(pkg.displayName);
 
     const metadata = {
+      name: notebookName,
       properties: {
         [SL_PLUGIN_MANAGER_PROP_VERSION]: pkg.version,
         [SL_PLUGIN_MANAGER_PROP_UPDATED_AT]: new Date().toISOString(),
@@ -1092,7 +1095,7 @@ export class PluginManagerService {
     formData.append(
       'content',
       new Blob([notebookContent], { type: 'application/octet-stream' }),
-      `${pkg.packageName}.ipynb`,
+      notebookName,
     );
 
     const res = await fetch(`${this.origin}/ninotebook/v1/notebook/${encodeURIComponent(notebookId)}`, {
@@ -1488,5 +1491,9 @@ export class PluginManagerService {
     } catch {
       return filenameOrUrl;
     }
+  }
+
+  private ensureNotebookFileName(name: string): string {
+    return name.toLowerCase().endsWith('.ipynb') ? name : `${name}.ipynb`;
   }
 }
