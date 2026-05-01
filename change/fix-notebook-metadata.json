@@ -1,7 +1,0 @@
-{
-  "type": "patch",
-  "comment": "Preserve the .ipynb extension when installing and upgrading notebooks.",
-  "packageName": "systemlink-plugin-manager",
-  "email": "1458528+fredvisser@users.noreply.github.com",
-  "dependentChangeType": "patch"
-}

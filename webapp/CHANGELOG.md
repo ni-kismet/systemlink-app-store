@@ -1,8 +1,17 @@
 # Change Log - systemlink-plugin-manager
 
-<!-- This log was last generated on Wed, 15 Apr 2026 15:58:44 GMT and should not be manually modified. -->
+<!-- This log was last generated on Fri, 01 May 2026 22:16:43 GMT and should not be manually modified. -->
 
 <!-- Start content -->
+
+## 1.1.3
+
+Fri, 01 May 2026 22:16:43 GMT
+
+### Patches
+
+- `systemlink-plugin-manager`
+  - Preserve the .ipynb extension when installing and upgrading notebooks. (1458528+fredvisser@users.noreply.github.com)
 
 ## 1.1.2
 
