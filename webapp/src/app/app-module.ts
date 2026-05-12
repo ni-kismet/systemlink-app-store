@@ -31,6 +31,7 @@ import { NimbleCardModule } from '@ni/nimble-angular/card';
 import { NimbleChipModule } from '@ni/nimble-angular/chip';
 import { NimbleTableModule } from '@ni/nimble-angular/table';
 import { NimbleTableColumnTextModule } from '@ni/nimble-angular/table-column/text';
+import { NimbleTableColumnAnchorModule } from '@ni/nimble-angular/table-column/anchor';
 
 import { AppRoutingModule } from './app-routing-module';
 import { App } from './app';
@@ -81,6 +82,7 @@ import { PermissionBannerComponent } from './shared/permission-banner.component'
     NimbleIconMagnifyingGlassModule,
     NimbleTableModule,
     NimbleTableColumnTextModule,
+    NimbleTableColumnAnchorModule,
   ],
   providers: [
     { provide: APP_BASE_HREF, useValue: '/' },

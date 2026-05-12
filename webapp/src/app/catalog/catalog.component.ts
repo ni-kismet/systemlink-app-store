@@ -1,4 +1,4 @@
-import { Component, OnInit, AfterViewChecked, ElementRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, AfterViewInit, ElementRef } from '@angular/core';
 import { Router } from '@angular/router';
 import { AppPackage, AppType, APP_TYPES, APP_TYPE_LABELS, InstalledApp, FeedConfig } from '../models/plugin-manager.models';
 import { PluginManagerService } from '../services/plugin-manager.service';
@@ -11,7 +11,7 @@ import { isNewerVersion } from '../utils/semver';
   templateUrl: './catalog.component.html',
   styleUrl: './catalog.component.scss',
 })
-export class CatalogComponent implements OnInit, AfterViewChecked {
+export class CatalogComponent implements OnInit, OnDestroy, AfterViewInit {
   packages: AppPackage[] = [];
   filteredPackages: AppPackage[] = [];
   /** Installed apps in the current workspace, keyed by packageName. */
@@ -34,6 +34,7 @@ export class CatalogComponent implements OnInit, AfterViewChecked {
   private lastTrackedSearchTerm = '';
   private cardStyleSheet: CSSStyleSheet | null = null;
   private styledCards = new WeakSet<Element>();
+  private cardObserver: MutationObserver | null = null;
 
   constructor(
     private appStoreService: PluginManagerService,
@@ -42,8 +43,14 @@ export class CatalogComponent implements OnInit, AfterViewChecked {
     private elementRef: ElementRef,
   ) {}
 
-  ngAfterViewChecked(): void {
+  ngAfterViewInit(): void {
     this.injectCardLayoutStyles();
+    this.cardObserver = new MutationObserver(() => this.injectCardLayoutStyles());
+    this.cardObserver.observe(this.elementRef.nativeElement, { childList: true, subtree: true });
+  }
+
+  ngOnDestroy(): void {
+    this.cardObserver?.disconnect();
   }
 
   async ngOnInit(): Promise<void> {

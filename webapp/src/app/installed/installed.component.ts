@@ -16,6 +16,7 @@ interface InstalledEntry {
 interface InstalledTableRow extends Record<string, string> {
   packageName: string;
   displayName: string;
+  detailHref: string;
   installedVersion: string;
   availableVersion: string;
   type: string;
@@ -82,6 +83,14 @@ export class InstalledComponent implements OnInit {
     return this.selectedEntries.some(entry => entry.upgradeAvailable);
   }
 
+  get canUninstallSelected(): boolean {
+    if (!this.hasPermission || this.upgradingAll || !!this.actionLoading) {
+      return false;
+    }
+
+    return this.hasSelectedRows;
+  }
+
   openDetail(entry: InstalledEntry): void {
     this.router.navigate(['/catalog', entry.packageName]);
   }
@@ -89,6 +98,16 @@ export class InstalledComponent implements OnInit {
   onTableSelectionChange(event: Event): void {
     const selectionEvent = event as CustomEvent<{ selectedRecordIds: string[] }>;
     this.selectedPackageNames = selectionEvent.detail?.selectedRecordIds ?? [];
+  }
+
+  onAnchorColumnClick(event: Event): void {
+    const anchor = (event.target as HTMLElement)?.closest('a');
+    if (!anchor) return;
+    event.preventDefault();
+    const packageName = anchor.getAttribute('href')?.replace('#/catalog/', '');
+    if (packageName) {
+      this.router.navigate(['/catalog', packageName]);
+    }
   }
 
   async upgradeSelected(): Promise<void> {
@@ -363,6 +382,7 @@ export class InstalledComponent implements OnInit {
     return {
       packageName: entry.packageName,
       displayName: entry.catalogPkg?.displayName ?? entry.packageName,
+      detailHref: `#/catalog/${entry.packageName}`,
       installedVersion: this.getInstalledVersionLabel(entry),
       availableVersion,
       type: primaryType,

@@ -33,7 +33,8 @@
       *ngIf="hasSelectedRows"
       slot="start"
       appearance="ghost"
-      (click)="uninstallSelected()">
+      (click)="uninstallSelected()"
+      [disabled]="!canUninstallSelected">
       Uninstall
     </nimble-button>
 
@@ -52,7 +53,13 @@
     selection-mode="multiple"
     [data$]="tableRows$"
     (selection-change)="onTableSelectionChange($event)">
-    <nimble-table-column-text field-name="displayName">App</nimble-table-column-text>
+    <nimble-table-column-anchor
+      field-name="displayName"
+      label-field-name="displayName"
+      href-field-name="detailHref"
+      (click)="onAnchorColumnClick($event)">
+      App
+    </nimble-table-column-anchor>
     <nimble-table-column-text field-name="installedVersion">Installed</nimble-table-column-text>
     <nimble-table-column-text field-name="availableVersion">Available</nimble-table-column-text>
     <nimble-table-column-text field-name="type">Type</nimble-table-column-text>
