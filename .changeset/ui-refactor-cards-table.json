@@ -1,0 +1,4 @@
+{
+  "type": "minor",
+  "comment": "Replace catalog cards with ok-fv-card component and installed list with nimble-table\n\n- Migrated catalog grid to use ok-fv-card web component with improved styling and alignment\n- Replaced installed apps card layout with nimble-table supporting multiselect operations\n- Added conditional toolbar buttons for bulk upgrade and uninstall operations\n- Fixed card layout alignment using injected shadow DOM styles via adoptedStyleSheets"
+}
