@@ -2,13 +2,6 @@
 
 <div class="installed-header">
   <h2>Installed Apps</h2>
-  <nimble-button
-    *ngIf="upgradesAvailable > 0 && hasPermission"
-    appearance="outline"
-    (click)="upgradeAll()"
-    [disabled]="upgradingAll">
-    {{ upgradingAll ? 'Upgrading…' : 'Upgrade All (' + upgradesAvailable + ')' }}
-  </nimble-button>
 </div>
 
 <div *ngIf="loading" class="loading-container">
@@ -26,44 +19,44 @@
 </div>
 
 <div *ngIf="!loading && entries.length > 0">
-  <div *ngFor="let group of typeGroups" class="type-group">
-    <h3 class="type-group-header">{{ group.label }}</h3>
-    <div class="installed-list">
-      <div *ngFor="let entry of group.entries" class="installed-row" (click)="openDetail(entry)">
-        <div class="row-info">
-          <span class="row-name">{{ entry.catalogPkg?.displayName ?? entry.packageName }}</span>
-          <span class="row-version">
-            {{ getInstalledVersionLabel(entry) }}
-            <span *ngIf="entry.upgradeAvailable && entry.catalogPkg" class="upgrade-badge">
-              → v{{ entry.catalogPkg.version }}
-            </span>
-          </span>
-          <span class="row-meta">
-            {{ entry.installations[0].type }} · {{ getWorkspaceSummary(entry) }} · Last activity {{ getLastActivity(entry) | date:'mediumDate' }}
-          </span>
-          <div class="workspace-list">
-            <span *ngFor="let installation of entry.installations" class="workspace-pill" [class.current]="installation.isCurrentWorkspace">
-              {{ installation.workspaceName }}
-              <span *ngIf="installation.isCurrentWorkspace">(current)</span>
-            </span>
-          </div>
-        </div>
-        <div class="row-actions" *ngIf="hasPermission">
-          <nimble-button
-            *ngIf="entry.upgradeAvailable"
-            appearance="outline"
-            (click)="upgrade(entry); $event.stopPropagation()"
-            [disabled]="actionLoading === entry.packageName">
-            Upgrade
-          </nimble-button>
-          <nimble-button
-            appearance="ghost"
-            (click)="uninstall(entry); $event.stopPropagation()"
-            [disabled]="actionLoading === entry.packageName">
-            Uninstall All
-          </nimble-button>
-        </div>
-      </div>
-    </div>
-  </div>
+  <nimble-toolbar class="installed-toolbar" *ngIf="hasPermission">
+    <nimble-button
+      *ngIf="hasSelectedRows"
+      slot="start"
+      appearance="ghost"
+      (click)="upgradeSelected()"
+      [disabled]="!canUpgradeSelected">
+      Upgrade
+    </nimble-button>
+
+    <nimble-button
+      *ngIf="hasSelectedRows"
+      slot="start"
+      appearance="ghost"
+      (click)="uninstallSelected()">
+      Uninstall
+    </nimble-button>
+
+    <nimble-button
+      *ngIf="!hasSelectedRows"
+      slot="start"
+      appearance="outline"
+      (click)="upgradeAll()"
+      [disabled]="!canUpgradeAll">
+      {{ upgradingAll ? 'Upgrading…' : 'Upgrade All (' + upgradesAvailable + ')' }}
+    </nimble-button>
+  </nimble-toolbar>
+
+  <nimble-table
+    id-field-name="packageName"
+    selection-mode="multiple"
+    [data$]="tableRows$"
+    (selection-change)="onTableSelectionChange($event)">
+    <nimble-table-column-text field-name="displayName">App</nimble-table-column-text>
+    <nimble-table-column-text field-name="installedVersion">Installed</nimble-table-column-text>
+    <nimble-table-column-text field-name="availableVersion">Available</nimble-table-column-text>
+    <nimble-table-column-text field-name="type">Type</nimble-table-column-text>
+    <nimble-table-column-text field-name="workspaces">Workspaces</nimble-table-column-text>
+    <nimble-table-column-text field-name="lastActivity">Last Activity</nimble-table-column-text>
+  </nimble-table>
 </div>

@@ -23,8 +23,38 @@
 .app-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
+  align-items: stretch;
   gap: var(--sl-app-space-4);
   padding-bottom: var(--sl-app-space-6);
+}
+
+.app-grid > .ok-fv-card {
+  height: 100%;
+}
+
+.app-grid > .ok-fv-card::part(card-shell) {
+  height: 100%;
+}
+
+.app-grid > .ok-fv-card::part(main-region) {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+}
+
+.app-grid > .ok-fv-card::part(body) {
+  flex: 1 1 auto;
+}
+
+.card-icon-img {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+}
+
+.ok-fv-card nimble-chip[slot='badges'] {
+  height: var(--ni-nimble-control-slim-height, 24px);
+  min-height: var(--ni-nimble-control-slim-height, 24px);
 }
 
 .empty-state {

@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
-import { AppPackage, AppType, APP_TYPE_LABELS, WorkspaceInstallation } from '../models/plugin-manager.models';
+import { BehaviorSubject } from 'rxjs';
+import { AppPackage, WorkspaceInstallation } from '../models/plugin-manager.models';
 import { PluginManagerService } from '../services/plugin-manager.service';
 import { TelemetryService } from '../services/telemetry.service';
 import { compareSemver, isNewerVersion } from '../utils/semver';
@@ -12,10 +13,14 @@ interface InstalledEntry {
   upgradeAvailable: boolean;
 }
 
-interface TypeGroup {
-  type: AppType;
-  label: string;
-  entries: InstalledEntry[];
+interface InstalledTableRow extends Record<string, string> {
+  packageName: string;
+  displayName: string;
+  installedVersion: string;
+  availableVersion: string;
+  type: string;
+  workspaces: string;
+  lastActivity: string;
 }
 
 @Component({
@@ -26,7 +31,8 @@ interface TypeGroup {
 })
 export class InstalledComponent implements OnInit {
   entries: InstalledEntry[] = [];
-  typeGroups: TypeGroup[] = [];
+  private readonly tableRowsSubject = new BehaviorSubject<InstalledTableRow[]>([]);
+  readonly tableRows$ = this.tableRowsSubject.asObservable();
   feedId: string | null = null;
 
   hasPermission = true;
@@ -34,6 +40,7 @@ export class InstalledComponent implements OnInit {
   error = '';
   actionLoading: string | null = null;
   upgradingAll = false;
+  selectedPackageNames: string[] = [];
 
   constructor(
     private appStoreService: PluginManagerService,
@@ -49,8 +56,89 @@ export class InstalledComponent implements OnInit {
     return this.entries.filter(entry => entry.upgradeAvailable).length;
   }
 
+  get selectedEntries(): InstalledEntry[] {
+    return this.selectedPackageNames
+      .map(packageName => this.entries.find(entry => entry.packageName === packageName) ?? null)
+      .filter((entry): entry is InstalledEntry => !!entry);
+  }
+
+  get hasSelectedRows(): boolean {
+    return this.selectedPackageNames.length > 0;
+  }
+
+  get canUpgradeAll(): boolean {
+    if (!this.hasPermission || this.upgradingAll || !!this.actionLoading) {
+      return false;
+    }
+
+    return this.upgradesAvailable > 0;
+  }
+
+  get canUpgradeSelected(): boolean {
+    if (!this.hasPermission || this.upgradingAll || !!this.actionLoading) {
+      return false;
+    }
+
+    return this.selectedEntries.some(entry => entry.upgradeAvailable);
+  }
+
   openDetail(entry: InstalledEntry): void {
     this.router.navigate(['/catalog', entry.packageName]);
+  }
+
+  onTableSelectionChange(event: Event): void {
+    const selectionEvent = event as CustomEvent<{ selectedRecordIds: string[] }>;
+    this.selectedPackageNames = selectionEvent.detail?.selectedRecordIds ?? [];
+  }
+
+  async upgradeSelected(): Promise<void> {
+    if (this.upgradingAll || this.actionLoading) return;
+
+    const upgradableEntries = this.selectedEntries.filter(entry => entry.upgradeAvailable && entry.catalogPkg);
+    if (upgradableEntries.length === 0) return;
+
+    this.actionLoading = 'bulk-upgrade';
+    this.error = '';
+
+    try {
+      for (const entry of upgradableEntries) {
+        const feedId = entry.catalogPkg!.sourceFeedId ?? this.feedId;
+        if (!feedId) continue;
+        await this.appStoreService.upgradeAppAcrossWorkspaces(
+          feedId,
+          entry.catalogPkg!,
+          entry.installations,
+        );
+      }
+
+      await this.loadInstalledApps(false);
+    } catch (e: any) {
+      this.error = `Upgrade selected failed: ${e.message ?? e}`;
+    } finally {
+      this.actionLoading = null;
+    }
+  }
+
+  async uninstallSelected(): Promise<void> {
+    if (this.upgradingAll || this.actionLoading) return;
+
+    const selectedEntries = this.selectedEntries;
+    if (selectedEntries.length === 0) return;
+
+    this.actionLoading = 'bulk-uninstall';
+    this.error = '';
+
+    try {
+      for (const entry of selectedEntries) {
+        await this.appStoreService.uninstallAppAcrossWorkspaces(entry.installations);
+      }
+
+      await this.loadInstalledApps(false);
+    } catch (e: any) {
+      this.error = `Uninstall selected failed: ${e.message ?? e}`;
+    } finally {
+      this.actionLoading = null;
+    }
   }
 
   getInstalledVersionLabel(entry: InstalledEntry): string {
@@ -247,22 +335,39 @@ export class InstalledComponent implements OnInit {
           return leftName.localeCompare(rightName) || left.packageName.localeCompare(right.packageName);
         });
 
-      // Build type groups
-      const typeOrder: AppType[] = ['webapp', 'notebook', 'dashboard'];
-      const grouped = new Map<AppType, InstalledEntry[]>();
-      for (const entry of this.entries) {
-        const entryType = (entry.installations[0]?.type ?? 'webapp') as AppType;
-        const list = grouped.get(entryType) ?? [];
-        list.push(entry);
-        grouped.set(entryType, list);
-      }
-      this.typeGroups = typeOrder
-        .filter(t => grouped.has(t))
-        .map(t => ({ type: t, label: APP_TYPE_LABELS[t], entries: grouped.get(t)! }));
+      this.tableRowsSubject.next(this.entries.map(entry => this.toTableRow(entry)));
+      this.selectedPackageNames = this.selectedPackageNames.filter(packageName =>
+        this.entries.some(entry => entry.packageName === packageName),
+      );
     } catch (e: any) {
       this.error = e.message ?? 'Failed to load installed apps';
+      this.tableRowsSubject.next([]);
+      this.selectedPackageNames = [];
     } finally {
       this.loading = false;
     }
+  }
+
+  private toTableRow(entry: InstalledEntry): InstalledTableRow {
+    const primaryType = entry.installations[0]?.type ?? 'webapp';
+    const workspaceList = entry.installations
+      .map(installation => installation.isCurrentWorkspace
+        ? `${installation.workspaceName} (current)`
+        : installation.workspaceName)
+      .join(', ');
+    const availableVersion = entry.upgradeAvailable && entry.catalogPkg
+      ? `v${entry.catalogPkg.version}`
+      : 'Up to date';
+    const lastActivity = this.getLastActivity(entry);
+
+    return {
+      packageName: entry.packageName,
+      displayName: entry.catalogPkg?.displayName ?? entry.packageName,
+      installedVersion: this.getInstalledVersionLabel(entry),
+      availableVersion,
+      type: primaryType,
+      workspaces: workspaceList,
+      lastActivity: lastActivity ? new Date(lastActivity).toLocaleDateString() : 'Unknown',
+    };
   }
 }
