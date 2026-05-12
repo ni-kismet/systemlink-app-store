@@ -1,8 +1,17 @@
 # Change Log - systemlink-plugin-manager
 
-<!-- This log was last generated on Fri, 01 May 2026 22:16:43 GMT and should not be manually modified. -->
+<!-- This log was last generated on Tue, 12 May 2026 12:55:14 GMT and should not be manually modified. -->
 
 <!-- Start content -->
+
+## 1.2.0
+
+Tue, 12 May 2026 12:55:14 GMT
+
+### Minor changes
+
+- `systemlink-plugin-manager`
+  - feat: replace catalog cards with ok-fv-card and installed list with nimble-table (1458528+fredvisser@users.noreply.github.com)
 
 ## 1.1.3
 

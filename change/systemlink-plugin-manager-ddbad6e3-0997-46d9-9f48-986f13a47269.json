@@ -1,7 +1,0 @@
-{
-  "type": "minor",
-  "comment": "feat: replace catalog cards with ok-fv-card and installed list with nimble-table",
-  "packageName": "systemlink-plugin-manager",
-  "email": "1458528+fredvisser@users.noreply.github.com",
-  "dependentChangeType": "patch"
-}
