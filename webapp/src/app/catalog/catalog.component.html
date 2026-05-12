@@ -29,13 +29,40 @@
 </nimble-banner>
 
 <div *ngIf="!loading && !error" class="app-grid">
-  <app-card
+  <ok-fv-card
+    class="ok-fv-card"
     *ngFor="let pkg of filteredPackages"
-    [pkg]="pkg"
-    [installed]="isInstalled(pkg)"
-    [upgradeAvailable]="hasUpgrade(pkg)"
-    (selected)="openDetail($event)">
-  </app-card>
+    [attr.card-title]="pkg.displayName"
+    [attr.subtitle]="getCardSubtitle(pkg)"
+    [attr.description]="pkg.description"
+    appearance="block"
+    interaction-mode="card"
+    [attr.initials]="pkg.displayName.charAt(0)"
+    (click)="openDetail(pkg)">
+    <img
+      *ngIf="pkg.icon"
+      slot="icon"
+      [src]="pkg.icon"
+      alt=""
+      class="card-icon-img" />
+
+    <nimble-chip
+      *ngIf="hasUpgrade(pkg)"
+      slot="badges"
+      appearance="outline">
+      Update
+    </nimble-chip>
+
+    <nimble-chip
+      *ngIf="isInstalled(pkg) && !hasUpgrade(pkg)"
+      slot="badges"
+      appearance="outline">
+      Installed
+    </nimble-chip>
+
+    <span slot="footer-start">{{ pkg.category }}</span>
+    <span slot="footer-end">v{{ pkg.version }}</span>
+  </ok-fv-card>
 
   <div *ngIf="filteredPackages.length === 0" class="empty-state">
     <p>No apps found matching your search criteria.</p>

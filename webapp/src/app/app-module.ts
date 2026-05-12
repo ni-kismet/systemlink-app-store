@@ -28,6 +28,10 @@ import {
 } from '@ni/nimble-angular';
 import { NimbleLabelProviderCoreModule } from '@ni/nimble-angular/label-provider/core';
 import { NimbleCardModule } from '@ni/nimble-angular/card';
+import { NimbleChipModule } from '@ni/nimble-angular/chip';
+import { NimbleTableModule } from '@ni/nimble-angular/table';
+import { NimbleTableColumnTextModule } from '@ni/nimble-angular/table-column/text';
+import { NimbleTableColumnAnchorModule } from '@ni/nimble-angular/table-column/anchor';
 
 import { AppRoutingModule } from './app-routing-module';
 import { App } from './app';
@@ -36,7 +40,6 @@ import { AppDetailComponent } from './detail/detail.component';
 import { InstalledComponent } from './installed/installed.component';
 import { SettingsComponent } from './settings/settings.component';
 import { OnboardingComponent } from './onboarding/onboarding.component';
-import { AppCardComponent } from './catalog/app-card.component';
 import { PermissionBannerComponent } from './shared/permission-banner.component';
 
 @NgModule({
@@ -47,7 +50,6 @@ import { PermissionBannerComponent } from './shared/permission-banner.component'
     InstalledComponent,
     SettingsComponent,
     OnboardingComponent,
-    AppCardComponent,
     PermissionBannerComponent,
   ],
   imports: [
@@ -69,6 +71,7 @@ import { PermissionBannerComponent } from './shared/permission-banner.component'
     NimbleTabPanelModule,
     NimbleDialogModule,
     NimbleCardModule,
+    NimbleChipModule,
     NimbleMenuButtonModule,
     NimbleMenuModule,
     NimbleMenuItemModule,
@@ -77,6 +80,9 @@ import { PermissionBannerComponent } from './shared/permission-banner.component'
     NimbleAnchorTabsModule,
     NimbleAnchorTabModule,
     NimbleIconMagnifyingGlassModule,
+    NimbleTableModule,
+    NimbleTableColumnTextModule,
+    NimbleTableColumnAnchorModule,
   ],
   providers: [
     { provide: APP_BASE_HREF, useValue: '/' },

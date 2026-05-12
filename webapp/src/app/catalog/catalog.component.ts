@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy, AfterViewInit, ElementRef } from '@angular/core';
 import { Router } from '@angular/router';
 import { AppPackage, AppType, APP_TYPES, APP_TYPE_LABELS, InstalledApp, FeedConfig } from '../models/plugin-manager.models';
 import { PluginManagerService } from '../services/plugin-manager.service';
@@ -11,7 +11,7 @@ import { isNewerVersion } from '../utils/semver';
   templateUrl: './catalog.component.html',
   styleUrl: './catalog.component.scss',
 })
-export class CatalogComponent implements OnInit {
+export class CatalogComponent implements OnInit, OnDestroy, AfterViewInit {
   packages: AppPackage[] = [];
   filteredPackages: AppPackage[] = [];
   /** Installed apps in the current workspace, keyed by packageName. */
@@ -32,12 +32,26 @@ export class CatalogComponent implements OnInit {
   installingPackage: string | null = null;
   private searchTelemetryTimeout: ReturnType<typeof setTimeout> | null = null;
   private lastTrackedSearchTerm = '';
+  private cardStyleSheet: CSSStyleSheet | null = null;
+  private styledCards = new WeakSet<Element>();
+  private cardObserver: MutationObserver | null = null;
 
   constructor(
     private appStoreService: PluginManagerService,
     private router: Router,
     private telemetry: TelemetryService,
+    private elementRef: ElementRef,
   ) {}
+
+  ngAfterViewInit(): void {
+    this.injectCardLayoutStyles();
+    this.cardObserver = new MutationObserver(() => this.injectCardLayoutStyles());
+    this.cardObserver.observe(this.elementRef.nativeElement, { childList: true, subtree: true });
+  }
+
+  ngOnDestroy(): void {
+    this.cardObserver?.disconnect();
+  }
 
   async ngOnInit(): Promise<void> {
     try {
@@ -159,6 +173,20 @@ export class CatalogComponent implements OnInit {
     this.router.navigate(['/catalog', pkg.packageName]);
   }
 
+  getCardSubtitle(pkg: AppPackage): string {
+    const type = (pkg.type || 'webapp').toLowerCase();
+    switch (type) {
+      case 'webapp':
+        return 'Web App';
+      case 'notebook':
+        return 'Notebook';
+      case 'dashboard':
+        return 'Dashboard';
+      default:
+        return type.charAt(0).toUpperCase() + type.slice(1);
+    }
+  }
+
   async install(pkg: AppPackage, event: Event): Promise<void> {
     event.stopPropagation();
     if (this.installingPackage) return;
@@ -196,6 +224,28 @@ export class CatalogComponent implements OnInit {
       this.error = `Install failed: ${e.message}`;
     } finally {
       this.installingPackage = null;
+    }
+  }
+
+  /**
+   * Inject CSS into ok-fv-card shadow roots to fix the height propagation
+   * chain that the browser's default button centering breaks.
+   * card-button-content has no `part` attribute, so ::part() cannot reach it.
+   */
+  private injectCardLayoutStyles(): void {
+    if (!this.cardStyleSheet) {
+      this.cardStyleSheet = new CSSStyleSheet();
+      this.cardStyleSheet.replaceSync(
+        '.card-button-content { height: 100%; display: flex; flex-direction: column; } '
+        + '.card-layout { flex: 1; }'
+      );
+    }
+    const cards = this.elementRef.nativeElement.querySelectorAll('ok-fv-card');
+    for (const card of cards) {
+      if (card.shadowRoot && !this.styledCards.has(card)) {
+        card.shadowRoot.adoptedStyleSheets = [...card.shadowRoot.adoptedStyleSheets, this.cardStyleSheet];
+        this.styledCards.add(card);
+      }
     }
   }
 
