@@ -31,13 +31,13 @@ export class AppDetailComponent implements OnInit {
   workspaceInstallations: WorkspaceInstallation[] = [];
   installOptions: WorkspaceInstallOption[] = [];
   pendingWorkspaceIds: string[] = [];
+  selectedWorkspaceId = '';
   isEditMode = false;
   private originalInstalledIds = new Set<string>();
   private allInstallations: WorkspaceInstallation[] = [];
 
   @ViewChild('installDialog') private installDialogEl?: ElementRef;
   @ViewChild('confirmDialog') private confirmDialogEl?: ElementRef;
-  @ViewChild('workspaceSelect') private workspaceSelectEl?: ElementRef;
 
   hasPermission = true;
   loading = true;
@@ -176,6 +176,7 @@ export class AppDetailComponent implements OnInit {
     if (!this.pkg) return;
 
     this.isEditMode = this.installedSomewhere;
+    this.selectedWorkspaceId = '';
     this.originalInstalledIds = new Set(this.workspaceInstallations.map(i => i.workspaceId));
 
     if (this.isEditMode) {
@@ -200,15 +201,11 @@ export class AppDetailComponent implements OnInit {
     (this.installDialogEl?.nativeElement as any)?.close();
   }
 
-  onWorkspaceSelected(event: Event): void {
-    const select = event.target as HTMLElement & { value: string };
-    const id = select.value;
+  onWorkspaceSelected(id: string): void {
     if (id && !this.pendingWorkspaceIds.includes(id)) {
       this.pendingWorkspaceIds = [...this.pendingWorkspaceIds, id];
     }
-    // Reset select back to placeholder
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (this.workspaceSelectEl?.nativeElement as any).value = '';
+    this.selectedWorkspaceId = '';
   }
 
   removeWorkspace(id: string): void {
@@ -238,6 +235,20 @@ export class AppDetailComponent implements OnInit {
   getScreenshotAlt(index: number): string {
     const displayName = this.pkg?.displayName ?? 'Package';
     return `${displayName} screenshot ${index + 1}`;
+  }
+
+  getCardSubtitle(pkg: AppPackage): string {
+    const type = (pkg.type || 'webapp').toLowerCase();
+    switch (type) {
+      case 'webapp':
+        return 'Web App';
+      case 'notebook':
+        return 'Notebook';
+      case 'dashboard':
+        return 'Dashboard';
+      default:
+        return type.charAt(0).toUpperCase() + type.slice(1);
+    }
   }
 
   async applyWorkspaceChanges(): Promise<void> {
@@ -361,6 +372,16 @@ export class AppDetailComponent implements OnInit {
   closeUninstallDialog(): void {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (this.confirmDialogEl?.nativeElement as any)?.close();
+  }
+
+  get pendingWorkspaceSummary(): string {
+    if (this.pendingWorkspaceIds.length === 0) {
+      return this.isEditMode
+        ? 'No workspaces selected. Remove all selections to uninstall this package everywhere.'
+        : 'Select at least one workspace to continue.';
+    }
+
+    return `${this.pendingWorkspaceIds.length} workspace${this.pendingWorkspaceIds.length === 1 ? '' : 's'} selected.`;
   }
 
   async uninstall(): Promise<void> {

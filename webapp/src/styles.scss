@@ -66,3 +66,224 @@ textarea,
 select {
   font-family: inherit;
 }
+
+.page-banner {
+  margin-bottom: var(--sl-app-space-4);
+}
+
+.page-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sl-app-space-2);
+  padding: var(--sl-app-space-6) 0 var(--sl-app-space-4);
+}
+
+.page-eyebrow {
+  margin: 0;
+  color: var(--sl-app-color-text-muted);
+  font: var(--sl-app-font-control-label);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.page-title {
+  margin: 0;
+  font: var(--sl-app-font-title);
+  color: var(--sl-app-color-text);
+}
+
+.page-summary {
+  margin: 0;
+  color: var(--sl-app-color-text);
+  font: var(--sl-app-font-body);
+  line-height: 1.5;
+}
+
+.sl-definition-list {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--sl-app-space-1) var(--sl-app-space-3);
+  margin: 0 0 var(--sl-app-space-4);
+
+  dt {
+    color: var(--sl-app-color-text-muted);
+    font: var(--sl-app-font-control-label);
+  }
+
+  dd {
+    margin: 0;
+    color: var(--sl-app-color-text);
+    font: var(--sl-app-font-body);
+  }
+}
+
+.sl-dialog-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sl-app-space-3);
+}
+
+.sl-dialog-stack--compact {
+  gap: var(--sl-app-space-2);
+}
+
+.sl-dialog-copy,
+.sl-dialog-hint {
+  margin: 0;
+  font: var(--sl-app-font-body);
+}
+
+.sl-dialog-hint {
+  color: var(--sl-app-color-text-muted);
+}
+
+.sl-selection-list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--sl-app-color-border);
+  border-radius: var(--sl-app-space-1);
+  overflow: hidden;
+}
+
+.sl-selection-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sl-app-space-2);
+  padding: var(--sl-app-space-2) var(--sl-app-space-2) var(--sl-app-space-2) var(--sl-app-space-3);
+}
+
+.sl-selection-row + .sl-selection-row {
+  border-top: 1px solid var(--sl-app-color-border);
+}
+
+.sl-selection-label {
+  flex: 1;
+}
+
+.sl-selection-action {
+  flex-shrink: 0;
+}
+
+.page-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sl-app-space-3);
+  padding: calc(var(--sl-app-space-6) * 2);
+  color: var(--sl-app-color-text-muted);
+  text-align: center;
+
+  p {
+    margin: 0;
+    font: var(--sl-app-font-body);
+  }
+}
+
+.page-status--empty {
+  border: 1px dashed var(--sl-app-color-border);
+  border-radius: var(--sl-app-space-2);
+  background: color-mix(in srgb, var(--sl-app-color-surface) 70%, transparent);
+}
+
+.page-status--compact {
+  padding: var(--sl-app-space-6);
+}
+
+.sl-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sl-app-space-6);
+  min-height: 100%;
+  padding: var(--sl-app-space-6) 0;
+}
+
+.sl-page__intro {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sl-app-space-4);
+  max-width: 60rem;
+
+  h2,
+  h3,
+  p {
+    margin: 0;
+  }
+
+  p {
+    color: var(--sl-app-color-text-muted);
+    max-width: 56rem;
+  }
+}
+
+.sl-page__eyebrow {
+  margin: 0;
+  font: var(--sl-app-font-control-label);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sl-app-color-text-muted);
+}
+
+.sl-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sl-app-space-2);
+  min-height: 40px;
+  border-bottom: 1px solid var(--sl-app-color-border);
+  padding-bottom: var(--sl-app-space-2);
+}
+
+.sl-toolbar__primary,
+.sl-toolbar__end,
+.sl-toolbar__filters,
+.sl-toolbar__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sl-app-space-2);
+}
+
+.sl-toolbar__end {
+  margin-left: auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.sl-panel-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sl-app-space-4);
+}
+
+.sl-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--sl-app-space-2);
+  flex-shrink: 0;
+}
+
+@media (max-width: 900px) {
+  .sl-toolbar {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .sl-toolbar__primary,
+  .sl-toolbar__end,
+  .sl-toolbar__filters,
+  .sl-toolbar__actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .sl-panel-heading {
+    flex-direction: column;
+  }
+
+  .sl-panel-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}

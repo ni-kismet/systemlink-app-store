@@ -8,6 +8,7 @@ nimble-theme-provider {
   height: 100%;
   background: var(--ni-nimble-application-background-color);
   color: var(--ni-nimble-body-font-color);
+  font: var(--sl-app-font-body);
 
   /* Theme-aware color/shadow aliases — defined here so they resolve where
      Nimble sets its design tokens (on nimble-theme-provider itself). */
@@ -42,4 +43,8 @@ nimble-theme-provider {
   min-height: 0;
   overflow: auto;
   padding: 0 var(--sl-app-space-6);
+}
+
+.mock-phase-banner {
+  margin-top: var(--sl-app-space-4);
 }

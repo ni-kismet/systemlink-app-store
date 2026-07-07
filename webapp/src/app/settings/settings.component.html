@@ -1,97 +1,181 @@
-<h2>Settings</h2>
-
-<div *ngIf="loading" class="loading-container">
+<div *ngIf="loading" class="page-status">
   <nimble-spinner></nimble-spinner>
-  <span>Loading settings…</span>
+  <p>Loading settings…</p>
 </div>
 
-<nimble-banner *ngIf="error" severity="error" [open]="true">
-  {{ error }}
-</nimble-banner>
-
-<nimble-banner *ngIf="refreshResult" severity="information" [open]="true">
-  {{ refreshResult }}
-</nimble-banner>
-
-<div *ngIf="!loading" class="settings-content">
-  <section class="settings-section">
-    <div class="section-header">
-      <h3>Configured Feeds</h3>
-    </div>
-    <p class="hint">
-      The Plugin Manager reads packages from the feeds listed below.
-      Plugins can be installed from any configured feed.
+<section *ngIf="!loading" class="settings sl-page">
+  <div class="page-header">
+    <p class="page-eyebrow">Settings</p>
+    <h2 class="page-title">Manage Plugin Manager Configuration</h2>
+    <p class="page-summary">
+      Manage the feeds, hosted behavior, and app context that shape how Plugin Manager discovers and installs SystemLink extensions.
     </p>
+  </div>
 
-    <div *ngIf="feeds.length === 0" class="empty-state">
-      <p>No feeds configured. Add a feed to get started.</p>
-    </div>
+  <nimble-banner *ngIf="error" class="page-banner" severity="error" [open]="true">
+    {{ error }}
+  </nimble-banner>
 
-    <div *ngIf="canAddNiFeed" class="ni-feed-callout">
-      <div>
-        <h4>{{ niFeedConfigName }}</h4>
-        <p>
-          Register the official NI Plugin Manager feed. If the feed already exists in SystemLink, this reconnects it instead of creating a duplicate.
-        </p>
+  <nimble-banner *ngIf="refreshResult" class="page-banner" severity="information" [open]="true">
+    {{ refreshResult }}
+  </nimble-banner>
+
+  <div class="settings__layout">
+    <aside class="settings__nav">
+      <div class="settings__nav-group" *ngFor="let group of sectionGroups">
+        <p class="settings__nav-title">{{ group.title }}</p>
+        <button
+          *ngFor="let item of group.items"
+          type="button"
+          class="settings__nav-item"
+          [class.is-active]="item.id === activeSection"
+          (click)="selectSection(item.id)">
+          {{ item.label }}
+        </button>
       </div>
-      <nimble-button appearance="outline" (click)="addNiFeed()" [disabled]="!!refreshingFeedId || addingNiFeed || removingFeed">
-        {{ addingNiFeed ? 'Adding…' : niFeedActionLabel }}
-      </nimble-button>
-    </div>
+    </aside>
 
-    <div *ngFor="let feed of feeds" class="feed-row">
-      <dl class="settings-list feed-details">
-        <dt>Name</dt><dd>{{ feed.name }}</dd>
-        <dt>Feed ID</dt><dd class="mono">{{ feed.feedId }}</dd>
-        <dt>Source URL</dt><dd>{{ feed.url }}</dd>
-      </dl>
-      <div class="feed-actions">
-        <nimble-button appearance="outline" (click)="refreshFeed(feed)" [disabled]="!!refreshingFeedId">
-          {{ isRefreshing(feed) ? 'Refreshing…' : 'Refresh' }}
-        </nimble-button>
-        <nimble-button appearance="outline" (click)="openRemoveFeedDialog(feed)" [disabled]="!!refreshingFeedId || removingFeed">
-          Remove
-        </nimble-button>
+    <section class="settings__content" [ngSwitch]="activeSection">
+      <div class="settings__panel" *ngSwitchCase="'feeds'">
+        <header class="settings__panel-header">
+          <div class="sl-panel-heading">
+            <div>
+              <h3>Configured Feeds</h3>
+              <p>The Plugin Manager reads packages from the feeds listed below. Plugins can be installed from any configured feed.</p>
+            </div>
+            <div class="sl-panel-actions">
+              <nimble-button appearance="outline" (click)="openAddFeedDialog()" [disabled]="!!refreshingFeedId || addingFeed">
+                Add Feed
+              </nimble-button>
+            </div>
+          </div>
+          <p class="settings__toolbar-hint">Feed updates are refreshed per source so you can stage replication deliberately.</p>
+        </header>
+
+        <section *ngIf="canAddNiFeed" class="settings__group">
+          <h4>{{ niFeedConfigName }}</h4>
+          <p>Register the official NI Plugin Manager feed. If the feed already exists in SystemLink, this reconnects it instead of creating a duplicate.</p>
+          <div class="ni-feed-callout">
+            <div>
+              <h5>Official feed registration</h5>
+              <p>Use this when you want the curated NI feed available immediately without duplicating an existing replicated source.</p>
+            </div>
+            <nimble-button appearance="outline" (click)="addNiFeed()" [disabled]="!!refreshingFeedId || addingNiFeed || removingFeed">
+              {{ addingNiFeed ? 'Adding…' : niFeedActionLabel }}
+            </nimble-button>
+          </div>
+        </section>
+
+        <div *ngIf="feeds.length === 0" class="page-status page-status--empty page-status--compact">
+          <p>No feeds configured. Add a feed to get started.</p>
+        </div>
+
+        <div *ngIf="feeds.length > 0" class="settings__stack settings__stack--spacious">
+          <div *ngFor="let feed of feeds" class="feed-row">
+            <dl class="settings__facts feed-details">
+              <div>
+                <dt>Name</dt>
+                <dd>{{ feed.name }}</dd>
+              </div>
+              <div>
+                <dt>Feed ID</dt>
+                <dd class="mono">{{ feed.feedId }}</dd>
+              </div>
+              <div>
+                <dt>Source URL</dt>
+                <dd>{{ feed.url }}</dd>
+              </div>
+            </dl>
+            <div class="feed-actions">
+              <nimble-button appearance="outline" (click)="refreshFeed(feed)" [disabled]="!!refreshingFeedId">
+                {{ isRefreshing(feed) ? 'Refreshing…' : 'Refresh' }}
+              </nimble-button>
+              <nimble-button appearance="outline" (click)="openRemoveFeedDialog(feed)" [disabled]="!!refreshingFeedId || removingFeed">
+                Remove
+              </nimble-button>
+            </div>
+          </div>
+        </div>
+
+        <section class="settings__group">
+          <h4>Refresh behavior</h4>
+          <p>Refresh checks the source feed for updated packages and downloads them into the replicated SystemLink feed.</p>
+        </section>
       </div>
-    </div>
 
-    <p class="hint">Refresh checks the source feed for updated packages and downloads them.</p>
-    <div class="section-actions">
-      <nimble-button appearance="outline" (click)="openAddFeedDialog()" [disabled]="!!refreshingFeedId">Add Feed</nimble-button>
-    </div>
-  </section>
+      <div class="settings__panel" *ngSwitchCase="'preview'">
+        <header class="settings__panel-header">
+          <h3>Lifecycle Preview</h3>
+          <p>Quickly switch the app into a mocked lifecycle phase for UI review without changing backend data.</p>
+        </header>
 
-  <section class="settings-section">
-    <h3>About</h3>
-    <p>Plugin Manager for SystemLink — curated package discovery and installation for SystemLink extensions.</p>
-    <dl class="settings-list">
-      <dt>Version</dt>
-      <dd>{{ version }}</dd>
-      <dt>Installed Apps</dt>
-      <dd>{{ installedCount }}</dd>
-    </dl>
-  </section>
-</div>
+        <div class="settings__stack settings__stack--tight">
+          <nimble-select
+            class="mock-phase-select"
+            [(ngModel)]="selectedMockPhase"
+            (ngModelChange)="applyMockPhase($event)">
+            Mock Lifecycle Phase
+            <nimble-list-option *ngFor="let option of mockPhaseOptions" [value]="option.value">
+              {{ option.label }}
+            </nimble-list-option>
+          </nimble-select>
+          <p class="hint">{{ selectedMockPhaseDescription }}</p>
+        </div>
+      </div>
+
+      <div class="settings__panel" *ngSwitchDefault>
+        <header class="settings__panel-header">
+          <h3>About</h3>
+          <p>Hosted facts and app metadata stay here so operators can verify the active context without leaving Plugin Manager.</p>
+        </header>
+
+        <dl class="settings__facts">
+          <div>
+            <dt>Version</dt>
+            <dd>{{ version }}</dd>
+          </div>
+          <div>
+            <dt>Installed Apps</dt>
+            <dd>{{ installedCount }}</dd>
+          </div>
+          <div>
+            <dt>Configured Feeds</dt>
+            <dd>{{ configuredFeedCount }}</dd>
+          </div>
+          <div>
+            <dt>Hosted Origin</dt>
+            <dd>{{ currentOrigin }}</dd>
+          </div>
+          <div>
+            <dt>Auth Mode</dt>
+            <dd>{{ hostedAuthMode }}</dd>
+          </div>
+        </dl>
+      </div>
+    </section>
+  </div>
+</section>
 
 <nimble-dialog #addFeedDialog>
   <span slot="title">Add Feed</span>
   <span slot="subtitle">Enter the URL of a Plugin Manager-compatible feed.</span>
   <div class="form-stack">
-    <label class="field-label">Feed URL</label>
     <nimble-text-field
       [(ngModel)]="addFeedUrl"
       (ngModelChange)="onAddFeedUrlChange()"
       placeholder="https://your-feed-url">
+      Feed URL
     </nimble-text-field>
-    <label class="field-label">Display Name</label>
     <nimble-text-field
       [(ngModel)]="addFeedName"
       placeholder="My Internal Feed">
+      Display Name
     </nimble-text-field>
-    <label class="checkbox-option">
-      <input type="checkbox" [(ngModel)]="addFeedShouldReplicate" />
+    <nimble-checkbox
+      class="checkbox-option"
+      [(ngModel)]="addFeedShouldReplicate">
       Replicate feed into SystemLink first
-    </label>
+    </nimble-checkbox>
     <p class="hint form-hint">{{ addFeedReplicationHint }}</p>
   </div>
   <nimble-button appearance="ghost" slot="footer" (click)="closeAddFeedDialog()">Cancel</nimble-button>
@@ -105,10 +189,13 @@
   <span *ngIf="feedPendingRemoval">
     Remove the configured feed "{{ feedPendingRemoval.name }}"? Apps from this feed will no longer appear in the catalog.
   </span>
-  <label *ngIf="feedPendingRemoval" class="remove-feed-option">
-    <input type="checkbox" [(ngModel)]="deleteReplicatedFeedOnRemove" [disabled]="removingFeed" />
+  <nimble-checkbox
+    *ngIf="feedPendingRemoval"
+    class="remove-feed-option"
+    [(ngModel)]="deleteReplicatedFeedOnRemove"
+    [disabled]="removingFeed">
     Delete the replicated SystemLink feed
-  </label>
+  </nimble-checkbox>
   <nimble-button appearance="ghost" slot="footer" (click)="closeRemoveFeedDialog()" [disabled]="removingFeed">Cancel</nimble-button>
   <nimble-button appearance="outline" slot="footer" (click)="removeFeed()" [disabled]="!feedPendingRemoval || removingFeed">
     {{ removingFeed ? 'Removing…' : 'Remove Feed' }}

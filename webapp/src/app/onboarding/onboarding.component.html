@@ -21,11 +21,11 @@
         <p>
           Plugin Manager replicates the source feed into your local SystemLink instance so packages can be browsed and installed locally.
         </p>
-        <label class="field-label">Feed URL</label>
         <nimble-text-field
           [(ngModel)]="feedUrl"
           (ngModelChange)="onFeedUrlChange()"
           placeholder="https://…">
+          Feed URL
         </nimble-text-field>
 
         <nimble-banner *ngIf="showFeedConflict" severity="warning" [open]="true">

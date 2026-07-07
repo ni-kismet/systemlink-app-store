@@ -106,14 +106,8 @@
   }
 }
 
-.field-label {
-  display: block;
-  margin-bottom: var(--sl-app-space-1);
-  color: var(--sl-app-color-text-muted);
-  font: var(--sl-app-font-control-label);
-}
-
 nimble-text-field {
+  display: block;
   width: 100%;
 }
 

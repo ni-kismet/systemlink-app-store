@@ -1,7 +1,7 @@
 .catalog-toolbar {
   display: flex;
   gap: var(--sl-app-space-3);
-  padding: var(--sl-app-space-4) 0;
+  padding: 0 0 var(--sl-app-space-4);
   align-items: center;
 
   nimble-text-field {
@@ -9,15 +9,6 @@
     min-width: 200px;
     max-width: 25rem;
   }
-}
-
-.loading-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--sl-app-space-3);
-  padding: calc(var(--sl-app-space-6) * 2);
-  color: var(--sl-app-color-text-muted);
 }
 
 .app-grid {
@@ -57,16 +48,8 @@
   min-height: var(--ni-nimble-control-slim-height, 24px);
 }
 
-.empty-state {
+.app-grid > .page-status--empty {
   grid-column: 1 / -1;
-  text-align: center;
-  padding: calc(var(--sl-app-space-6) * 2);
-  color: var(--sl-app-color-text-muted);
-
-  p {
-    margin: 0;
-    font: var(--sl-app-font-body);
-  }
 }
 
 @media (max-width: 768px) {
