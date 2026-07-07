@@ -377,7 +377,7 @@ export class AppDetailComponent implements OnInit {
   get pendingWorkspaceSummary(): string {
     if (this.pendingWorkspaceIds.length === 0) {
       return this.isEditMode
-        ? 'No workspaces selected. Remove all selections to uninstall this package everywhere.'
+        ? 'No workspaces selected. Applying changes will uninstall this package from every workspace where it is currently installed.'
         : 'Select at least one workspace to continue.';
     }
 

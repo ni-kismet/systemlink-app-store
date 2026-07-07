@@ -9,7 +9,7 @@
     <main class="app-content">
       <nimble-banner *ngIf="mockPhase" class="mock-phase-banner" severity="information" [open]="true">
         Mock lifecycle phase active: {{ mockPhaseLabel }}.
-        Use <strong>?mockPhase=not-onboarded</strong>, <strong>catalog</strong>, <strong>installed</strong>, or <strong>upgrade</strong> to switch states quickly.
+        Use <strong>?mockPhase=not-onboarded</strong>, <strong>?mockPhase=catalog</strong>, <strong>?mockPhase=installed</strong>, or <strong>?mockPhase=upgrade</strong> to switch states quickly.
       </nimble-banner>
       <router-outlet></router-outlet>
     </main>

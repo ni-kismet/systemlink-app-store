@@ -29,6 +29,7 @@
           type="button"
           class="settings__nav-item"
           [class.is-active]="item.id === activeSection"
+          [attr.aria-current]="item.id === activeSection ? 'page' : null"
           (click)="selectSection(item.id)">
           {{ item.label }}
         </button>
