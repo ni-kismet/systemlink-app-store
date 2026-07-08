@@ -1,8 +1,21 @@
-import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
+import { Component, ElementRef, OnInit, ViewChild, isDevMode } from '@angular/core';
 import { Router } from '@angular/router';
 import { PLUGIN_MANAGER_VERSION, FeedConfig, DEFAULT_FEED_URL, NI_FEED_CONFIG_NAME } from '../models/plugin-manager.models';
 import { PluginManagerService } from '../services/plugin-manager.service';
 import { TelemetryService } from '../services/telemetry.service';
+
+type MockPhaseOption = {
+  value: string;
+  label: string;
+  description: string;
+};
+
+type SettingsSectionId = 'feeds' | 'preview' | 'about';
+
+interface SettingsSectionGroup {
+  title: string;
+  items: { id: SettingsSectionId; label: string }[];
+}
 
 @Component({
   selector: 'app-settings',
@@ -18,6 +31,62 @@ export class SettingsComponent implements OnInit {
   installedCount = 0;
   readonly version = PLUGIN_MANAGER_VERSION;
   readonly niFeedConfigName = NI_FEED_CONFIG_NAME;
+  readonly isDevelopmentMode = isDevMode();
+  readonly hostedAuthMode = 'Same-origin cookies';
+  readonly currentOrigin = window.location.origin;
+  readonly sectionGroups: readonly SettingsSectionGroup[] = this.isDevelopmentMode
+    ? [
+      {
+        title: 'Configuration',
+        items: [
+          { id: 'feeds', label: 'Feeds' },
+          { id: 'preview', label: 'Lifecycle Preview' },
+        ],
+      },
+      {
+        title: 'Application',
+        items: [{ id: 'about', label: 'About' }],
+      },
+    ]
+    : [
+      {
+        title: 'Configuration',
+        items: [{ id: 'feeds', label: 'Feeds' }],
+      },
+      {
+        title: 'Application',
+        items: [{ id: 'about', label: 'About' }],
+      },
+    ];
+  readonly mockPhaseOptions: MockPhaseOption[] = [
+    {
+      value: '',
+      label: 'Live Data',
+      description: 'Use the current SystemLink environment without lifecycle mocking.',
+    },
+    {
+      value: 'not-onboarded',
+      label: 'Not Onboarded',
+      description: 'Show the onboarding flow before any feed is configured.',
+    },
+    {
+      value: 'catalog',
+      label: 'Catalog Available',
+      description: 'Show a configured feed with catalog data but no installed packages.',
+    },
+    {
+      value: 'installed',
+      label: 'Apps Installed',
+      description: 'Show installed packages across readable workspaces.',
+    },
+    {
+      value: 'upgrade',
+      label: 'Upgrade Available',
+      description: 'Show installed packages with an upgrade available for Plugin Manager.',
+    },
+  ];
+  activeSection: SettingsSectionId = 'feeds';
+  selectedMockPhase = '';
 
   loading = true;
   refreshingFeedId: string | null = null;
@@ -44,6 +113,7 @@ export class SettingsComponent implements OnInit {
 
   async ngOnInit(): Promise<void> {
     try {
+      this.selectedMockPhase = this.appStoreService.getMockPhase() ?? '';
       const [feedConfigs, installations, availableNiFeed] = await Promise.all([
         this.appStoreService.loadFeedConfigs(),
         this.appStoreService.listInstalledWebapps().catch(() => [] as any[]),
@@ -63,6 +133,10 @@ export class SettingsComponent implements OnInit {
     return this.feeds.length > 0;
   }
 
+  get configuredFeedCount(): number {
+    return this.feeds.length;
+  }
+
   get canAddNiFeed(): boolean {
     const configuredNiFeed = this.getConfiguredNiFeed();
     if (!configuredNiFeed) return true;
@@ -72,6 +146,40 @@ export class SettingsComponent implements OnInit {
 
   get niFeedActionLabel(): string {
     return this.getConfiguredNiFeed() && !this.availableNiFeed ? 'Re-add NI Feed' : 'Add NI Feed';
+  }
+
+  get selectedMockPhaseDescription(): string {
+    return this.mockPhaseOptions.find(option => option.value === this.selectedMockPhase)?.description
+      ?? this.mockPhaseOptions[0].description;
+  }
+
+  selectSection(sectionId: SettingsSectionId): void {
+    this.activeSection = sectionId;
+  }
+
+  applyMockPhase(value: string): void {
+    if (!this.isDevelopmentMode) {
+      return;
+    }
+
+    const url = new URL(window.location.href);
+    const currentPhase = url.searchParams.get('mockPhase') ?? '';
+    if (value === currentPhase) {
+      return;
+    }
+
+    this.telemetry.track('plugin_manager_mock_phase_changed', {
+      mockPhase: value || 'live-data',
+      source: 'settings',
+    });
+
+    if (value) {
+      url.searchParams.set('mockPhase', value);
+    } else {
+      url.searchParams.delete('mockPhase');
+    }
+
+    window.location.assign(url.toString());
   }
 
   async refreshFeed(feed: FeedConfig): Promise<void> {

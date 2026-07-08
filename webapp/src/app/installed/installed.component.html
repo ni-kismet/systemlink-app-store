@@ -1,19 +1,26 @@
-<app-permission-banner [hasPermission]="hasPermission"></app-permission-banner>
+<app-permission-banner
+  [hasPermission]="hasPermission"
+  readOnlyMessage="You can still review installed packages in read-only mode.">
+</app-permission-banner>
 
-<div class="installed-header">
-  <h2>Installed Apps</h2>
+<div class="page-header installed-header">
+  <p class="page-eyebrow">Installed</p>
+  <h2 class="page-title">Review Deployed Extensions</h2>
+  <p class="page-summary">
+    Track what is installed across readable workspaces and apply upgrades or removals where you have permission.
+  </p>
 </div>
 
-<div *ngIf="loading" class="loading-container">
+<div *ngIf="loading" class="page-status">
   <nimble-spinner></nimble-spinner>
-  <span>Loading installed apps…</span>
+  <p>Loading installed apps…</p>
 </div>
 
-<nimble-banner *ngIf="error" severity="error" [open]="true">
+<nimble-banner *ngIf="error" class="page-banner" severity="error" [open]="true">
   {{ error }}
 </nimble-banner>
 
-<div *ngIf="!loading && entries.length === 0 && !error" class="empty-state">
+<div *ngIf="!loading && entries.length === 0 && !error" class="page-status page-status--empty">
   <p>No apps installed in any readable workspace yet.</p>
   <nimble-button appearance="outline" (click)="router.navigate(['/catalog'])">Browse Catalog</nimble-button>
 </div>

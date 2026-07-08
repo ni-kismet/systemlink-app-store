@@ -1,15 +1,18 @@
-<div *ngIf="loading" class="loading-container">
+<app-permission-banner
+  [hasPermission]="hasPermission"
+  readOnlyMessage="You can still review package details in read-only mode.">
+</app-permission-banner>
+
+<div *ngIf="loading" class="page-status">
   <nimble-spinner></nimble-spinner>
-  <span>Loading…</span>
+  <p>Loading package details…</p>
 </div>
 
-<nimble-banner *ngIf="error" severity="error" [open]="true">
+<nimble-banner *ngIf="error" class="page-banner" severity="error" [open]="true">
   {{ error }}
 </nimble-banner>
 
 <ng-container *ngIf="!loading && pkg">
-  <app-permission-banner [hasPermission]="hasPermission"></app-permission-banner>
-
   <div class="detail-layout">
     <div class="detail-header">
       <div class="header-icon">
@@ -17,7 +20,9 @@
         <div *ngIf="!pkg.icon" class="icon-placeholder">{{ pkg.displayName.charAt(0) }}</div>
       </div>
       <div class="header-info">
+        <p class="page-eyebrow">{{ getCardSubtitle(pkg) }}</p>
         <h2 class="pkg-name">{{ pkg.displayName }}</h2>
+        <p class="page-summary">Review package details, screenshots, and workspace installations before you install, upgrade, or remove this extension.</p>
         <span class="pkg-author">{{ pkg.author }}</span>
         <span class="pkg-version">v{{ pkg.version }}</span>
       </div>
@@ -64,7 +69,7 @@
 
       <div class="detail-sidebar">
         <h3>Details</h3>
-        <dl class="meta-list">
+        <dl class="sl-definition-list">
           <dt>Category</dt>
           <dd>{{ pkg.category || '—' }}</dd>
           <dt>Type</dt>
@@ -92,7 +97,7 @@
 
         <div *ngIf="installed" class="installed-info">
           <h3>Current Workspace Installation</h3>
-          <dl class="meta-list">
+          <dl class="sl-definition-list">
             <dt>Installed Version</dt>
             <dd>v{{ installed.version }}</dd>
             <dt>Installed At</dt>
@@ -134,26 +139,33 @@
       <ng-container *ngIf="isEditMode">Add or remove workspaces for {{ pkg.displayName }}.</ng-container>
       <ng-container *ngIf="!isEditMode">Select one or more workspaces where {{ pkg.displayName }} should be installed.</ng-container>
     </span>
-    <nimble-select #workspaceSelect
+    <div class="sl-dialog-stack">
+      <nimble-select
       filter-mode="standard"
       class="workspace-select"
+      [(ngModel)]="selectedWorkspaceId"
       [disabled]="actionLoading"
-      (change)="onWorkspaceSelected($event)">
+      (ngModelChange)="onWorkspaceSelected($event)">
+      Add workspace
       <nimble-list-option value="" disabled selected hidden>Select workspace…</nimble-list-option>
       <nimble-list-option
         *ngFor="let option of selectableOptions; trackBy: trackWorkspaceById"
         [value]="option.workspaceId">
         {{ option.workspaceName }}{{ option.isCurrentWorkspace ? ' (current)' : '' }}
       </nimble-list-option>
-    </nimble-select>
-    <div class="pending-workspaces-list" *ngIf="pendingWorkspaceIds.length > 0">
-      <div *ngFor="let id of pendingWorkspaceIds" class="pending-workspace-row">
-        <span class="pending-workspace-name">
-          {{ getWorkspaceName(id) }}
-          <span *ngIf="isCurrentWorkspace(id)" class="pending-workspace-current">(current)</span>
-          <span *ngIf="isAlreadyInstalled(id) && !isCurrentWorkspace(id)" class="pending-workspace-current">(installed)</span>
-        </span>
-        <nimble-button appearance="ghost" class="pending-workspace-remove" (click)="removeWorkspace(id)" [disabled]="actionLoading">✕</nimble-button>
+      </nimble-select>
+
+      <p class="sl-dialog-hint">{{ pendingWorkspaceSummary }}</p>
+
+      <div class="sl-selection-list" *ngIf="pendingWorkspaceIds.length > 0">
+        <div *ngFor="let id of pendingWorkspaceIds" class="sl-selection-row">
+          <span class="sl-selection-label pending-workspace-name">
+            {{ getWorkspaceName(id) }}
+            <span *ngIf="isCurrentWorkspace(id)" class="pending-workspace-current">(current)</span>
+            <span *ngIf="isAlreadyInstalled(id) && !isCurrentWorkspace(id)" class="pending-workspace-current">(installed)</span>
+          </span>
+          <nimble-button appearance="ghost" class="sl-selection-action" (click)="removeWorkspace(id)" [disabled]="actionLoading">Remove</nimble-button>
+        </div>
       </div>
     </div>
     <nimble-button appearance="ghost" slot="footer" (click)="closeInstallDialog()">Cancel</nimble-button>
@@ -165,7 +177,12 @@
   <!-- Uninstall confirmation dialog -->
   <nimble-dialog #confirmDialog>
     <span slot="title">Confirm Uninstall</span>
-    <span>Uninstall {{ pkg.displayName }} from all {{ workspaceInstallations.length }} workspace{{ workspaceInstallations.length === 1 ? '' : 's' }}?</span>
+    <div class="sl-dialog-stack sl-dialog-stack--compact">
+      <p class="sl-dialog-copy">
+        Uninstall {{ pkg.displayName }} from all {{ workspaceInstallations.length }} workspace{{ workspaceInstallations.length === 1 ? '' : 's' }}?
+      </p>
+      <p class="sl-dialog-hint">This removes the installed resources from every workspace listed in this package detail.</p>
+    </div>
     <nimble-button appearance="ghost" slot="footer" (click)="closeUninstallDialog()">Cancel</nimble-button>
     <nimble-button appearance="outline" slot="footer" (click)="uninstall()">Uninstall All</nimble-button>
   </nimble-dialog>

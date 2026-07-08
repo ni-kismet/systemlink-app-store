@@ -14,6 +14,8 @@ import { PluginManagerService } from './services/plugin-manager.service';
 export class App implements OnInit, OnDestroy {
   currentTheme: 'light' | 'dark' = 'light';
   activeTabId = 'catalog';
+  mockPhase: string | null = null;
+  mockPhaseLabel = '';
   private themeObserver: MutationObserver | null = null;
   private routerSub?: Subscription;
 
@@ -25,6 +27,8 @@ export class App implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.currentTheme = this.detectInitialTheme();
+    this.mockPhase = this.pluginManagerService.getMockPhase();
+    this.mockPhaseLabel = this.describeMockPhase(this.mockPhase);
     this.watchParentTheme();
     void this.ensureOwnWebappTag();
     this.activeTabId = this.tabIdFromUrl(this.router.url);
@@ -47,6 +51,21 @@ export class App implements OnInit, OnDestroy {
     if (url.startsWith('/installed')) return 'installed';
     if (url.startsWith('/settings')) return 'settings';
     return 'catalog';
+  }
+
+  private describeMockPhase(phase: string | null): string {
+    switch (phase) {
+      case 'not-onboarded':
+        return 'Not Onboarded';
+      case 'catalog':
+        return 'Catalog Available';
+      case 'installed':
+        return 'Apps Installed';
+      case 'upgrade':
+        return 'Upgrade Available';
+      default:
+        return '';
+    }
   }
 
   private async ensureOwnWebappTag(): Promise<void> {

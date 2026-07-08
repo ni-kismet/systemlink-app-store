@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, isDevMode } from '@angular/core';
 import {
   AppPackage,
   AppType,
@@ -51,6 +51,17 @@ import { createClient as createNotebookClient, createConfig as createNotebookCon
 import { compareSemver } from '../utils/semver';
 import { extractFirstMatch } from '../utils/nipkg-extract';
 
+type MockLifecyclePhase = 'not-onboarded' | 'catalog' | 'installed' | 'upgrade';
+
+type MockPluginManagerState = {
+  phase: MockLifecyclePhase;
+  currentWorkspace: string;
+  workspaces: WorkspaceInfo[];
+  feedConfigs: FeedConfig[];
+  packages: AppPackage[];
+  installations: WorkspaceInstallation[];
+};
+
 const LEGACY_APPSTORE_PROP_FEEDS = 'appstore.feeds';
 const LEGACY_APPSTORE_PROP_PACKAGE = 'appstore.packageName';
 const LEGACY_APPSTORE_PROP_VERSION = 'appstore.version';
@@ -73,10 +84,17 @@ const LEGACY_DASHBOARD_TAG_FEED_PREFIX = 'appstore-feed-';
 const FEED_JOB_POLL_ATTEMPTS = 60;
 const FEED_JOB_POLL_DELAY_MS = 2000;
 const MAX_APPLY_UPDATE_DESCRIPTORS = 1000;
+const MOCK_FEED_ID = 'mock-feed-default';
+const MOCK_FEED_URL = DEFAULT_FEED_URL;
+const MOCK_CURRENT_WORKSPACE_ID = 'workspace-default';
+const MOCK_SECONDARY_WORKSPACE_ID = 'workspace-labs';
+const MOCK_INSTALLED_AT = '2026-07-01T12:00:00.000Z';
 
 @Injectable({ providedIn: 'root' })
 export class PluginManagerService {
   private origin = window.location.origin;
+  private readonly mockPhase = this.readMockPhase();
+  private mockState = this.createMockState(this.mockPhase);
 
   // Each generated service has a different base URL path prefix burned into its spec.
   // For browser same-origin use we replace the spec's scheme+host with window.location.origin
@@ -105,9 +123,240 @@ export class PluginManagerService {
   private workspacesCache: Promise<WorkspaceInfo[]> | null = null;
   private static readonly CACHE_TTL_MS = 60_000; // 1 minute
 
+  getMockPhase(): string | null {
+    return this.mockState?.phase ?? null;
+  }
+
   /** Invalidate installation-related caches after mutations. */
   private invalidateInstallCache(): void {
     this.installedCache = null;
+  }
+
+  private readMockPhase(): MockLifecyclePhase | null {
+    if (!isDevMode()) {
+      return null;
+    }
+
+    try {
+      const rawValue = new URLSearchParams(window.location.search).get('mockPhase')?.trim().toLowerCase();
+      switch (rawValue) {
+        case 'not-onboarded':
+        case 'onboarding':
+          return 'not-onboarded';
+        case 'catalog':
+        case 'catalog-available':
+          return 'catalog';
+        case 'installed':
+        case 'apps-installed':
+          return 'installed';
+        case 'upgrade':
+        case 'upgrade-available':
+          return 'upgrade';
+        default:
+          return null;
+      }
+    } catch {
+      return null;
+    }
+  }
+
+  private createMockState(phase: MockLifecyclePhase | null): MockPluginManagerState | null {
+    if (!phase) {
+      return null;
+    }
+
+    const workspaces: WorkspaceInfo[] = [
+      { id: MOCK_CURRENT_WORKSPACE_ID, name: 'Default' },
+      { id: MOCK_SECONDARY_WORKSPACE_ID, name: 'NI Labs' },
+    ];
+    const feedConfigs = phase === 'not-onboarded'
+      ? []
+      : [{ name: NI_FEED_CONFIG_NAME, url: MOCK_FEED_URL, feedId: MOCK_FEED_ID }];
+    const packages = this.createMockPackages();
+
+    let installations: WorkspaceInstallation[] = [];
+    if (phase === 'installed') {
+      installations = [
+        this.createMockInstallation(packages[0], workspaces[0], packages[0].version),
+        this.createMockInstallation(packages[1], workspaces[1], packages[1].version),
+      ];
+    } else if (phase === 'upgrade') {
+      installations = [
+        this.createMockInstallation(packages[0], workspaces[0], '1.1.3'),
+        this.createMockInstallation(packages[1], workspaces[1], packages[1].version),
+      ];
+    }
+
+    return {
+      phase,
+      currentWorkspace: MOCK_CURRENT_WORKSPACE_ID,
+      workspaces,
+      feedConfigs,
+      packages,
+      installations,
+    };
+  }
+
+  private createMockPackages(): AppPackage[] {
+    return [
+      {
+        packageName: PLUGIN_MANAGER_PACKAGE_NAME,
+        version: PLUGIN_MANAGER_VERSION,
+        displayName: 'Plugin Manager for SystemLink',
+        description: 'A curated plugin manager for discovering, installing, upgrading, and removing SystemLink extensions from replicated package feeds.',
+        section: 'Administration',
+        maintainer: 'NI Kismet <systemlink@example.com>',
+        homepage: 'https://github.com/ni-kismet/systemlink-plugin-manager',
+        icon: '',
+        screenshots: [],
+        category: 'Administration',
+        type: 'webapp',
+        author: 'NI Kismet',
+        license: 'MIT',
+        tags: 'systemlink,plugin manager,administration',
+        repo: 'https://github.com/ni-kismet/systemlink-plugin-manager',
+        minServerVersion: '2025.0.0',
+        size: 1_048_576,
+        sha256: 'mock-plugin-manager-sha256',
+        filename: 'systemlink-plugin-manager_1.2.0_all.nipkg',
+        sourceFeedId: MOCK_FEED_ID,
+      },
+      {
+        packageName: 'ni-labs-welcome',
+        version: '0.1.0',
+        displayName: 'NI Labs Welcome',
+        description: 'A minimal NI Labs example plugin used to verify build, packaging, and app-store submission automation.',
+        section: 'Diagnostics',
+        maintainer: 'NI Labs <nilabs@example.com>',
+        homepage: '',
+        icon: '',
+        screenshots: [],
+        category: 'Diagnostics',
+        type: 'webapp',
+        author: 'NI Labs',
+        license: 'MIT',
+        tags: 'welcome,example,diagnostics',
+        repo: '',
+        minServerVersion: '2025.0.0',
+        size: 262_144,
+        sha256: 'mock-ni-labs-welcome-sha256',
+        filename: 'ni-labs-welcome_0.1.0_all.nipkg',
+        sourceFeedId: MOCK_FEED_ID,
+      },
+      {
+        packageName: 'ni-labs-asset-calibration-alarms-notification',
+        version: '0.1.0',
+        displayName: 'Asset Calibration Alarms and Notification',
+        description: 'A SystemLink notebook that creates calibration alarms and sends email notifications based on managed asset due dates.',
+        section: 'Automation',
+        maintainer: 'NI Labs <nilabs@example.com>',
+        homepage: '',
+        icon: '',
+        screenshots: [],
+        category: 'Automation',
+        type: 'notebook',
+        author: 'NI Labs',
+        license: 'MIT',
+        tags: 'calibration,notebook,automation',
+        repo: '',
+        minServerVersion: '2025.0.0',
+        size: 393_216,
+        sha256: 'mock-asset-calibration-sha256',
+        filename: 'ni-labs-asset-calibration-alarms-notification_0.1.0_all.nipkg',
+        sourceFeedId: MOCK_FEED_ID,
+      },
+    ];
+  }
+
+  private createMockInstallation(
+    pkg: AppPackage,
+    workspace: WorkspaceInfo,
+    version: string,
+  ): WorkspaceInstallation {
+    return {
+      packageName: pkg.packageName,
+      resourceName: pkg.displayName,
+      version,
+      type: pkg.type as AppType,
+      webappId: `mock-${pkg.packageName}-${workspace.id}`,
+      feedId: pkg.sourceFeedId ?? MOCK_FEED_ID,
+      feedUrl: MOCK_FEED_URL,
+      installedAt: MOCK_INSTALLED_AT,
+      updatedAt: version === pkg.version ? null : '2026-07-03T09:30:00.000Z',
+      workspaceId: workspace.id,
+      workspaceName: workspace.name,
+      isCurrentWorkspace: workspace.id === MOCK_CURRENT_WORKSPACE_ID,
+    };
+  }
+
+  private cloneMockFeedConfigs(): FeedConfig[] {
+    return (this.mockState?.feedConfigs ?? []).map(feed => ({ ...feed }));
+  }
+
+  private cloneMockPackages(): AppPackage[] {
+    return (this.mockState?.packages ?? []).map(pkg => ({
+      ...pkg,
+      screenshots: [...pkg.screenshots],
+    }));
+  }
+
+  private cloneMockInstallations(): WorkspaceInstallation[] {
+    return (this.mockState?.installations ?? []).map(installation => ({ ...installation }));
+  }
+
+  private mockFeedConfigForId(feedId: string | null | undefined): FeedConfig | null {
+    if (!feedId || !this.mockState) {
+      return null;
+    }
+    return this.mockState.feedConfigs.find(feed => feed.feedId === feedId) ?? null;
+  }
+
+  private installMockPackage(pkg: AppPackage, workspaceId: string, feedConfig: FeedConfig | null): void {
+    if (!this.mockState) {
+      return;
+    }
+
+    const workspace = this.mockState.workspaces.find(item => item.id === workspaceId);
+    if (!workspace) {
+      throw new Error('Cannot install app: workspace unknown');
+    }
+
+    const effectiveFeed = feedConfig
+      ?? this.mockFeedConfigForId(pkg.sourceFeedId)
+      ?? this.mockState.feedConfigs[0]
+      ?? { name: NI_FEED_CONFIG_NAME, url: MOCK_FEED_URL, feedId: MOCK_FEED_ID };
+
+    const nextInstallation = this.createMockInstallation(pkg, workspace, pkg.version);
+    nextInstallation.feedId = effectiveFeed.feedId;
+    nextInstallation.feedUrl = effectiveFeed.url;
+
+    this.mockState.installations = [
+      ...this.mockState.installations.filter(existing =>
+        !(existing.packageName === pkg.packageName && existing.workspaceId === workspaceId)
+      ),
+      nextInstallation,
+    ];
+  }
+
+  private upgradeMockInstallation(webappId: string, version: string): void {
+    if (!this.mockState) {
+      return;
+    }
+
+    this.mockState.installations = this.mockState.installations.map(installation =>
+      installation.webappId === webappId
+        ? { ...installation, version, updatedAt: new Date().toISOString() }
+        : installation,
+    );
+  }
+
+  private removeMockInstallations(webappIds: string[]): void {
+    if (!this.mockState) {
+      return;
+    }
+
+    const ids = new Set(webappIds);
+    this.mockState.installations = this.mockState.installations.filter(installation => !ids.has(installation.webappId));
   }
 
   // ── Feed Service ──────────────────────────────────────────────
@@ -163,6 +412,11 @@ export class PluginManagerService {
 
   /** List all feeds and find the default Plugin Manager feed by name. */
   async discoverFeed(): Promise<{ id: string; name: string } | null> {
+    if (this.mockState) {
+      const feed = this.mockState.feedConfigs[0];
+      return feed ? { id: feed.feedId, name: feed.name } : null;
+    }
+
     const feeds = await this.listFeeds();
     const feed = feeds.find(f =>
       (f as any).packageSources?.some((src: string) => this.isSameFeedUrl(src, DEFAULT_FEED_URL))
@@ -172,6 +426,11 @@ export class PluginManagerService {
 
   /** Find an existing feed whose packageSources contain the given URL. */
   async findFeedBySourceUrl(sourceUrl: string): Promise<{ id: string; name: string } | null> {
+    if (this.mockState) {
+      const feed = this.mockState.feedConfigs.find(item => this.isSameFeedUrl(item.url, sourceUrl));
+      return feed ? { id: feed.feedId, name: feed.name } : null;
+    }
+
     const feeds = await this.listFeeds();
     const feed = feeds.find(f =>
       (f as any).packageSources?.some((src: string) => this.isSameFeedUrl(src, sourceUrl))
@@ -187,6 +446,21 @@ export class PluginManagerService {
 
   /** Ensure the official NI feed exists in SystemLink and return its config payload. */
   async ensureOfficialFeedRegistered(): Promise<{ created: boolean; feedConfig: FeedConfig }> {
+    if (this.mockState) {
+      const existingFeed = this.mockState.feedConfigs.find(feed => this.isSameFeedUrl(feed.url, DEFAULT_FEED_URL));
+      if (existingFeed) {
+        return { created: false, feedConfig: { ...existingFeed } };
+      }
+
+      const feedConfig = {
+        name: NI_FEED_CONFIG_NAME,
+        url: DEFAULT_FEED_URL,
+        feedId: MOCK_FEED_ID,
+      };
+      this.mockState.feedConfigs = [feedConfig];
+      return { created: true, feedConfig: { ...feedConfig } };
+    }
+
     const existingFeed = await this.findFeedBySourceUrl(DEFAULT_FEED_URL);
     if (existingFeed) {
       return {
@@ -212,6 +486,16 @@ export class PluginManagerService {
 
   /** Add or replace a feed config, deduplicating by feed ID and normalized source URL. */
   async upsertFeedConfig(feedConfig: FeedConfig): Promise<FeedConfig[]> {
+    if (this.mockState) {
+      this.mockState.feedConfigs = [
+        ...this.mockState.feedConfigs.filter(feed =>
+          feed.feedId !== feedConfig.feedId && !this.isSameFeedUrl(feed.url, feedConfig.url)
+        ),
+        { ...feedConfig },
+      ];
+      return this.cloneMockFeedConfigs();
+    }
+
     const existing = await this.loadFeedConfigs();
     const updated = [
       ...existing.filter(feed =>
@@ -248,6 +532,14 @@ export class PluginManagerService {
    * so downstream install/download calls use the correct feed.
    */
   async listPackagesFromFeeds(feeds: FeedConfig[]): Promise<AppPackage[]> {
+    if (this.mockState) {
+      if (feeds.length === 0) return [];
+      const feedIds = new Set(feeds.map(feed => feed.feedId));
+      return this.selectLatestPackages(
+        this.cloneMockPackages().filter(pkg => !pkg.sourceFeedId || feedIds.has(pkg.sourceFeedId)),
+      );
+    }
+
     if (feeds.length === 0) return [];
 
     const results = await Promise.allSettled(
@@ -275,6 +567,13 @@ export class PluginManagerService {
 
   /** Replicate a feed from a remote URL. */
   async replicateFeed(feedUrl: string, name: string = FEED_NAME): Promise<any> {
+    if (this.mockState) {
+      const feedId = this.isSameFeedUrl(feedUrl, DEFAULT_FEED_URL)
+        ? MOCK_FEED_ID
+        : `mock-feed-${this.mockState.feedConfigs.length + 1}`;
+      return { id: feedId, feedId, name, urls: [feedUrl] };
+    }
+
     const { data, error } = await postNifeedV1ReplicateFeed({
       client: this.feedsClient,
       body: {
@@ -289,6 +588,11 @@ export class PluginManagerService {
 
   /** Delete a replicated feed by ID. */
   async deleteReplicatedFeed(feedId: string): Promise<void> {
+    if (this.mockState) {
+      this.mockState.feedConfigs = this.mockState.feedConfigs.filter(feed => feed.feedId !== feedId);
+      return;
+    }
+
     const { error } = await deleteNifeedV1FeedsByFeedId({
       client: this.feedsClient,
       path: { feedId },
@@ -335,6 +639,12 @@ export class PluginManagerService {
   /** Trigger a check-for-updates job and poll until it completes.
    * Returns the list of feed-update resource IDs found (may be empty). */
   async checkForUpdates(feedId: string): Promise<string[]> {
+    if (this.mockState) {
+      return this.mockState.phase === 'upgrade' && this.mockFeedConfigForId(feedId)
+        ? ['mock-update-available']
+        : [];
+    }
+
     const { data, error } = await postNifeedV1FeedsByFeedIdCheckForUpdates({
       client: this.feedsClient,
       path: { feedId },
@@ -352,6 +662,10 @@ export class PluginManagerService {
    * the upstream packageUri download URLs), then posts them to apply-updates.
    * @param resourceIds  Feed-update IDs returned by checkForUpdates; skip if empty. */
   async applyUpdates(feedId: string, resourceIds: string[]): Promise<void> {
+    if (this.mockState) {
+      return;
+    }
+
     if (resourceIds.length === 0) return;
 
     // Collapse duplicate package URIs across update lists so we only enqueue each import once.
@@ -402,6 +716,10 @@ export class PluginManagerService {
 
   /** Resolve the workspace of the currently running webapp by reading the URL. */
   async getWorkspace(): Promise<string> {
+    if (this.mockState) {
+      return this.mockState.currentWorkspace;
+    }
+
     if (!this.workspacePromise) {
       this.workspacePromise = (async () => {
         try {
@@ -463,6 +781,10 @@ export class PluginManagerService {
 
   /** List webapps (to check permissions). Cached for the service lifetime. */
   async listWebapps(): Promise<any> {
+    if (this.mockState) {
+      return { webapps: [{ id: 'mock-webapp', workspace: this.mockState.currentWorkspace }] };
+    }
+
     if (!this.permissionCheckCache) {
       this.permissionCheckCache = sdkListWebapps({
         client: this.webAppClient,
@@ -499,6 +821,10 @@ export class PluginManagerService {
 
   /** List workspaces the current user can read. Cached for the service lifetime. */
   async listReadableWorkspaces(): Promise<WorkspaceInfo[]> {
+    if (this.mockState) {
+      return this.mockState.workspaces.map(workspace => ({ ...workspace }));
+    }
+
     if (!this.workspacesCache) {
       this.workspacesCache = (async () => {
         const { data, error } = await getWorkspaces({ client: this.userClient });
@@ -525,6 +851,10 @@ export class PluginManagerService {
   * property bag. Returns an empty array if none are configured.
    */
   async loadFeedConfigs(): Promise<FeedConfig[]> {
+    if (this.mockState) {
+      return this.cloneMockFeedConfigs();
+    }
+
     const ownId = this.getOwnWebappId();
     if (!ownId) return [];
 
@@ -553,6 +883,12 @@ export class PluginManagerService {
    * Merges with any existing non-plugin-manager properties so they are preserved.
    */
   async saveFeedConfigs(feeds: FeedConfig[]): Promise<void> {
+    if (this.mockState) {
+      this.mockState.feedConfigs = feeds.map(feed => ({ ...feed }));
+      this.invalidateInstallCache();
+      return;
+    }
+
     const ownId = this.getOwnWebappId();
     if (!ownId) throw new Error('Cannot save feed config: Plugin Manager webapp ID not found');
 
@@ -587,6 +923,10 @@ export class PluginManagerService {
    * Should be called during onboarding once the primary feed is configured.
    */
   async tagOwnWebapp(feedId: string, feedUrl: string): Promise<void> {
+    if (this.mockState) {
+      return;
+    }
+
     const ownId = this.getOwnWebappId();
     if (!ownId) return;
 
@@ -638,6 +978,10 @@ export class PluginManagerService {
   * the configured feeds. Returns true when an update was applied.
    */
   async ensureOwnWebappTagged(preferredFeed?: FeedConfig | null): Promise<boolean> {
+    if (this.mockState) {
+      return !!(preferredFeed ?? this.mockState.feedConfigs[0]);
+    }
+
     const ownId = this.getOwnWebappId();
     if (!ownId) return false;
 
@@ -712,6 +1056,10 @@ export class PluginManagerService {
    * Queries webapps, notebooks, and dashboards in parallel.
    */
   async listInstalledWebapps(): Promise<WorkspaceInstallation[]> {
+    if (this.mockState) {
+      return this.cloneMockInstallations();
+    }
+
     const now = Date.now();
     if (this.installedCache && (now - this.installedCache.ts) < PluginManagerService.CACHE_TTL_MS) {
       return this.installedCache.promise;
@@ -913,6 +1261,13 @@ export class PluginManagerService {
     feedConfig: FeedConfig | null,
     workspace?: string,
   ): Promise<void> {
+    if (this.mockState) {
+      const resolvedWorkspace = workspace ? workspace : await this.getWorkspace();
+      this.installMockPackage(pkg, resolvedWorkspace, feedConfig);
+      this.invalidateInstallCache();
+      return;
+    }
+
     const resolvedWorkspace = workspace ? workspace : await this.getWorkspace();
     if (!resolvedWorkspace) throw new Error('Cannot install app: workspace unknown');
 
@@ -1000,6 +1355,21 @@ export class PluginManagerService {
     sourceDashboardUid: string,
     workspaces: string[],
   ): Promise<void> {
+    if (this.mockState) {
+      const source = this.mockState.installations.find(installation => installation.webappId === sourceDashboardUid);
+      if (!source) {
+        return;
+      }
+      for (const workspace of workspaces) {
+        const pkg = this.mockState.packages.find(item => item.packageName === source.packageName);
+        if (pkg) {
+          this.installMockPackage(pkg, workspace, this.mockFeedConfigForId(source.feedId));
+        }
+      }
+      this.invalidateInstallCache();
+      return;
+    }
+
     if (workspaces.length === 0) return;
 
     await this.ensureGrafanaSession();
@@ -1039,6 +1409,12 @@ export class PluginManagerService {
     pkg: AppPackage,
     installed: InstalledApp,
   ): Promise<void> {
+    if (this.mockState) {
+      this.upgradeMockInstallation(installed.webappId, pkg.version);
+      this.invalidateInstallCache();
+      return;
+    }
+
     const fileName = this.extractFileName(pkg.filename);
     const nipkgBlob = await this.downloadPackageFile(feedId, fileName);
 
@@ -1059,6 +1435,14 @@ export class PluginManagerService {
     pkg: AppPackage,
     installations: WorkspaceInstallation[],
   ): Promise<void> {
+    if (this.mockState) {
+      for (const installation of installations) {
+        this.upgradeMockInstallation(installation.webappId, pkg.version);
+      }
+      this.invalidateInstallCache();
+      return;
+    }
+
     const fileName = this.extractFileName(pkg.filename);
     const nipkgBlob = await this.downloadPackageFile(feedId, fileName);
 
@@ -1155,12 +1539,24 @@ export class PluginManagerService {
   /** Uninstall an app from a single workspace.
    * Routes to the correct service based on resource type. */
   async uninstallApp(installed: InstalledApp): Promise<void> {
+    if (this.mockState) {
+      this.removeMockInstallations([installed.webappId]);
+      this.invalidateInstallCache();
+      return;
+    }
+
     await this.deleteResource(installed);
     this.invalidateInstallCache();
   }
 
   /** Uninstall a package from every workspace where it is currently installed. */
   async uninstallAppAcrossWorkspaces(installations: WorkspaceInstallation[]): Promise<void> {
+    if (this.mockState) {
+      this.removeMockInstallations(installations.map(installation => installation.webappId));
+      this.invalidateInstallCache();
+      return;
+    }
+
     for (const installation of installations) {
       await this.deleteResource(installation);
     }
