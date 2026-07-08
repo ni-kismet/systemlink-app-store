@@ -1,8 +1,17 @@
 # Change Log - systemlink-plugin-manager
 
-<!-- This log was last generated on Tue, 12 May 2026 12:55:14 GMT and should not be manually modified. -->
+<!-- This log was last generated on Wed, 08 Jul 2026 15:25:18 GMT and should not be manually modified. -->
 
 <!-- Start content -->
+
+## 1.2.1
+
+Wed, 08 Jul 2026 15:25:18 GMT
+
+### Patches
+
+- `systemlink-plugin-manager`
+  - Refine plugin manager settings and lifecycle preview UX (1458528+fredvisser@users.noreply.github.com)
 
 ## 1.2.0
 
