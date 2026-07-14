@@ -1,8 +1,17 @@
 # Change Log - systemlink-plugin-manager
 
-<!-- This log was last generated on Wed, 08 Jul 2026 15:25:18 GMT and should not be manually modified. -->
+<!-- This log was last generated on Tue, 14 Jul 2026 13:58:53 GMT and should not be manually modified. -->
 
 <!-- Start content -->
+
+## 1.2.2
+
+Tue, 14 Jul 2026 13:58:53 GMT
+
+### Patches
+
+- `systemlink-plugin-manager`
+  - fix: upgrade webapp security dependencies (1458528+fredvisser@users.noreply.github.com)
 
 ## 1.2.1
 

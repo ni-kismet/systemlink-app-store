@@ -1,7 +1,0 @@
-{
-  "type": "patch",
-  "comment": "fix: upgrade webapp security dependencies",
-  "packageName": "systemlink-plugin-manager",
-  "email": "1458528+fredvisser@users.noreply.github.com",
-  "dependentChangeType": "patch"
-}
