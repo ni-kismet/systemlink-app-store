@@ -1,8 +1,8 @@
 {
   "schemaVersion": 2,
-  "nipkgFile": "systemlink-plugin-manager_1.2.1_all.nipkg",
-  "sha256": "287e546e548a161bd3e5f8bc512e514e5e7e900de032976f0eb43678c4e2ce71",
+  "nipkgFile": "systemlink-plugin-manager_1.2.2_all.nipkg",
+  "sha256": "857d43de4a1577965fa914596fd03ca38ab45488a879aa9b5a693dabeebad208",
   "sourceRepo": "ni-kismet/systemlink-plugin-manager",
-  "releaseTag": "systemlink-plugin-manager-v1.2.1",
-  "sourceCommit": "848e6d6b07f171381800bf5d26b1dd3610c029ed"
+  "releaseTag": "systemlink-plugin-manager-v1.2.2",
+  "sourceCommit": "0e111b1136277f7d87ab91b1994645e44488baf7"
 }
