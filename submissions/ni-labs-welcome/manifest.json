@@ -2,7 +2,7 @@
   "nipkgFile": "ni-labs-welcome_0.1.0_all.nipkg",
   "releaseTag": "ni-labs-welcome-v0.1.0",
   "schemaVersion": 2,
-  "sha256": "0674fbbb04e65a974a110a03fb231f4e82a8fb725c63b59eb3cb464f08e00119",
-  "sourceCommit": "52145c2f9634207a6e32eae093975f887bc969cc",
+  "sha256": "f1d40e3f1b3bd58ab7583283e681273f8608f06986aa4d8f2cdefe502090ec46",
+  "sourceCommit": "37b88c97eba15a4620c515c96b8c0c457799e7a7",
   "sourceRepo": "ni-kismet/systemlink-plugins-ni-labs"
 }
