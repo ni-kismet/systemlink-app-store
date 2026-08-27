@@ -75,12 +75,19 @@ export interface InstalledApp {
   updatedAt: string | null;
 }
 
+export type WebappResource = 'webvi' | 'notebook' | 'dataspace';
+export type WebappAction =
+  | 'webapp:createwebapp'
+  | 'webapp:updatewebapp'
+  | 'webapp:deletewebapp'
+  | 'webapp:uploadwebapp';
+export type WebappCapabilities = Partial<Record<WebappResource, Partial<Record<WebappAction, boolean>>>>;
+
 /** Represents a workspace for multi-workspace support. */
 export interface WorkspaceInfo {
   id: string;
   name: string;
-  /** Whether the current user can manage webapps in this workspace. */
-  canManageWebapps: boolean;
+  webappCapabilities: WebappCapabilities;
 }
 
 /** An installed plugin annotated with its package name and owning workspace. */
@@ -92,10 +99,8 @@ export interface WorkspaceInstallation extends InstalledApp {
   workspaceId: string;
   workspaceName: string;
   isCurrentWorkspace: boolean;
-  /** Whether the current user can read this workspace. */
   hasWorkspaceAccess: boolean;
-  /** Whether the current user can create, modify, and delete webapps here. */
-  canManageWebapps: boolean;
+  webappCapabilities: WebappCapabilities;
 }
 
 /** Combined view: catalog package + install status across workspaces. */

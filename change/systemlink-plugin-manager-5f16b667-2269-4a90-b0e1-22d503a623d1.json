@@ -1,0 +1,7 @@
+{
+  "type": "patch",
+  "comment": "Add catalog detail navigation and maintainer",
+  "packageName": "systemlink-plugin-manager",
+  "email": "1458528+fredvisser@users.noreply.github.com",
+  "dependentChangeType": "patch"
+}
