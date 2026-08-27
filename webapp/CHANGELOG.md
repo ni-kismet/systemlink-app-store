@@ -1,8 +1,17 @@
 # Change Log - systemlink-plugin-manager
 
-<!-- This log was last generated on Tue, 14 Jul 2026 13:58:53 GMT and should not be manually modified. -->
+<!-- This log was last generated on Thu, 27 Aug 2026 13:59:10 GMT and should not be manually modified. -->
 
 <!-- Start content -->
+
+## 1.2.3
+
+Thu, 27 Aug 2026 13:59:10 GMT
+
+### Patches
+
+- `systemlink-plugin-manager`
+  - Fix workspace-aware plugin manager actions (1458528+fredvisser@users.noreply.github.com)
 
 ## 1.2.2
 
