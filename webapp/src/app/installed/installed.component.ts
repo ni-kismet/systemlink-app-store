@@ -88,7 +88,7 @@ export class InstalledComponent implements OnInit {
       return false;
     }
 
-    return this.selectedEntries.some(entry => this.manageableInstallations(entry).length > 0);
+    return this.selectedEntries.some(entry => this.uninstallableInstallations(entry).length > 0);
   }
 
   openDetail(entry: InstalledEntry): void {
@@ -125,7 +125,7 @@ export class InstalledComponent implements OnInit {
         await this.appStoreService.upgradeAppAcrossWorkspaces(
           feedId,
           entry.catalogPkg!,
-          this.manageableInstallations(entry),
+          this.upgradeableInstallations(entry),
         );
       }
 
@@ -141,7 +141,7 @@ export class InstalledComponent implements OnInit {
     if (!this.hasPermission || this.upgradingAll || this.actionLoading) return;
 
     const selectedInstallations = this.selectedEntries
-      .map(entry => this.manageableInstallations(entry))
+      .map(entry => this.uninstallableInstallations(entry))
       .filter(installations => installations.length > 0);
     if (selectedInstallations.length === 0) return;
 
@@ -184,7 +184,7 @@ export class InstalledComponent implements OnInit {
   }
 
   async upgrade(entry: InstalledEntry): Promise<void> {
-    const installations = this.manageableInstallations(entry);
+    const installations = this.upgradeableInstallations(entry);
     if (!entry.catalogPkg || installations.length === 0 || this.actionLoading) return;
     const feedId = entry.catalogPkg.sourceFeedId ?? this.feedId;
     if (!feedId) return;
@@ -236,7 +236,7 @@ export class InstalledComponent implements OnInit {
         await this.appStoreService.upgradeAppAcrossWorkspaces(
           feedId,
           entry.catalogPkg!,
-          this.manageableInstallations(entry),
+          this.upgradeableInstallations(entry),
         );
       }
 
@@ -258,7 +258,7 @@ export class InstalledComponent implements OnInit {
   }
 
   async uninstall(entry: InstalledEntry): Promise<void> {
-    const installations = this.manageableInstallations(entry);
+    const installations = this.uninstallableInstallations(entry);
     if (installations.length === 0 || this.actionLoading) return;
     const telemetryPackage = entry.catalogPkg
       ? this.telemetry.packageFromAppPackage(entry.catalogPkg)
@@ -312,12 +312,13 @@ export class InstalledComponent implements OnInit {
         this.appStoreService.loadFeedConfigs(),
         this.appStoreService.listInstalledWebapps(),
       ]);
+      const accessibleInstallations = installations.filter(installation => installation.hasWorkspaceAccess);
 
       this.feedId = feedConfigs[0]?.feedId ?? null;
 
       // If no feed config, infer from installed webapps
-      if (!this.feedId && installations.length > 0) {
-        this.feedId = installations[0].feedId || null;
+      if (!this.feedId && accessibleInstallations.length > 0) {
+        this.feedId = accessibleInstallations[0].feedId || null;
       }
 
       let catalogMap = new Map<string, AppPackage>();
@@ -335,7 +336,7 @@ export class InstalledComponent implements OnInit {
 
       // Group installations by packageName
       const groupedInstallations = new Map<string, WorkspaceInstallation[]>();
-      for (const installation of installations) {
+      for (const installation of accessibleInstallations) {
         const list = groupedInstallations.get(installation.packageName) ?? [];
         list.push(installation);
         groupedInstallations.set(installation.packageName, list);
@@ -349,7 +350,7 @@ export class InstalledComponent implements OnInit {
             installations: pkgInstallations.sort((left, right) => left.workspaceName.localeCompare(right.workspaceName)),
             catalogPkg,
             upgradeAvailable: !!catalogPkg && pkgInstallations.some(i =>
-              this.isManageableInstallation(i) && isNewerVersion(catalogPkg.version, i.version)
+              this.canUpgradeInstallation(i) && isNewerVersion(catalogPkg.version, i.version)
             ),
           };
         })
@@ -396,11 +397,21 @@ export class InstalledComponent implements OnInit {
     };
   }
 
-  private isManageableInstallation(installation: WorkspaceInstallation): boolean {
-    return installation.hasWorkspaceAccess && installation.canManageWebapps;
+  private canUpgradeInstallation(installation: WorkspaceInstallation): boolean {
+    return installation.hasWorkspaceAccess
+      && this.appStoreService.canUpgradeApp(installation.webappCapabilities, installation.type);
   }
 
-  private manageableInstallations(entry: InstalledEntry): WorkspaceInstallation[] {
-    return entry.installations.filter(installation => this.isManageableInstallation(installation));
+  private upgradeableInstallations(entry: InstalledEntry): WorkspaceInstallation[] {
+    return entry.installations.filter(installation => this.canUpgradeInstallation(installation));
+  }
+
+  private canUninstallInstallation(installation: WorkspaceInstallation): boolean {
+    return installation.hasWorkspaceAccess
+      && this.appStoreService.canUninstallApp(installation.webappCapabilities, installation.type);
+  }
+
+  private uninstallableInstallations(entry: InstalledEntry): WorkspaceInstallation[] {
+    return entry.installations.filter(installation => this.canUninstallInstallation(installation));
   }
 }

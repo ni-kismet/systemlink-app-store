@@ -13,6 +13,9 @@
 </nimble-banner>
 
 <ng-container *ngIf="!loading && pkg">
+  <div class="detail-back-link">
+    <nimble-anchor nimbleRouterLink="/catalog">Back to catalog</nimble-anchor>
+  </div>
   <div class="detail-layout">
     <div class="detail-header">
       <div class="header-icon">
@@ -26,13 +29,13 @@
         <span class="pkg-version">v{{ pkg.version }}</span>
       </div>
       <div class="header-actions" *ngIf="hasPermission">
-        <nimble-button *ngIf="installableWorkspaces.length > 0 || installedSomewhere" appearance="outline" (click)="openInstallDialog()" [disabled]="actionLoading">
+        <nimble-button *ngIf="canEditWorkspaceAssignments" appearance="outline" (click)="openInstallDialog()" [disabled]="actionLoading">
           {{ installedSomewhere ? 'Edit Workspaces' : 'Install' }}
         </nimble-button>
         <nimble-button *ngIf="installed && upgradeAvailable" appearance="outline" (click)="upgrade()" [disabled]="actionLoading">
           {{ actionLoading ? 'Upgrading…' : 'Upgrade' }}
         </nimble-button>
-        <nimble-button *ngIf="canManageAllInstallations" appearance="ghost" (click)="openUninstallDialog()" [disabled]="actionLoading">
+        <nimble-button *ngIf="canUninstallAllInstallations" appearance="ghost" (click)="openUninstallDialog()" [disabled]="actionLoading">
           Uninstall
         </nimble-button>
       </div>
@@ -71,6 +74,8 @@
         <dl class="sl-definition-list">
           <dt>Category</dt>
           <dd>{{ pkg.category || '—' }}</dd>
+          <dt>Maintainer</dt>
+          <dd>{{ pkg.maintainer || '—' }}</dd>
           <dt>Type</dt>
           <dd>{{ pkg.type }}</dd>
           <dt>License</dt>

@@ -7,6 +7,9 @@ import {
   InstalledApp,
   WorkspaceInfo,
   WorkspaceInstallation,
+  WebappAction,
+  WebappCapabilities,
+  WebappResource,
   FEED_NAME,
   NI_FEED_CONFIG_NAME,
   PLUGIN_MANAGER_PACKAGE_NAME,
@@ -55,6 +58,7 @@ import { compareSemver } from '../utils/semver';
 import { extractFirstMatch } from '../utils/nipkg-extract';
 
 type MockLifecyclePhase = 'not-onboarded' | 'catalog' | 'installed' | 'upgrade';
+type WebappOperation = 'install' | 'upgrade' | 'uninstall';
 
 type MockPluginManagerState = {
   phase: MockLifecyclePhase;
@@ -92,6 +96,12 @@ const MOCK_FEED_URL = DEFAULT_FEED_URL;
 const MOCK_CURRENT_WORKSPACE_ID = 'workspace-default';
 const MOCK_SECONDARY_WORKSPACE_ID = 'workspace-labs';
 const MOCK_INSTALLED_AT = '2026-07-01T12:00:00.000Z';
+const MOCK_WEBAPP_ACTIONS: WebappAction[] = [
+  'webapp:createwebapp',
+  'webapp:updatewebapp',
+  'webapp:deletewebapp',
+  'webapp:uploadwebapp',
+];
 
 @Injectable({ providedIn: 'root' })
 export class PluginManagerService {
@@ -130,13 +140,13 @@ export class PluginManagerService {
   private authStatementsCache: Promise<AuthStatement[]> | null = null;
   private static readonly CACHE_TTL_MS = 60_000; // 1 minute
   private static readonly WORKSPACE_PAGE_SIZE = 100;
-  private static readonly WEBAPP_MANAGEMENT_ACTIONS = [
-    'webapp:createwebapp',
-    'webapp:updatewebapp',
-    'webapp:deletewebapp',
-    'webapp:uploadwebapp',
-  ];
-  private static readonly WEBAPP_RESOURCE_TYPES = ['webvi', 'notebook', 'dataspace'];
+  private static readonly WEBAPP_MANAGEMENT_ACTIONS: WebappAction[] = MOCK_WEBAPP_ACTIONS;
+  private static readonly WEBAPP_RESOURCE_TYPES: WebappResource[] = ['webvi', 'notebook', 'dataspace'];
+  private static readonly WEBAPP_RESOURCE_FOR_APP_TYPE: Record<AppType, WebappResource> = {
+    webapp: 'webvi',
+    notebook: 'notebook',
+    dashboard: 'dataspace',
+  };
 
   getMockPhase(): string | null {
     return this.mockState?.phase ?? null;
@@ -181,8 +191,8 @@ export class PluginManagerService {
     }
 
     const workspaces: WorkspaceInfo[] = [
-      { id: MOCK_CURRENT_WORKSPACE_ID, name: 'Default', canManageWebapps: true },
-      { id: MOCK_SECONDARY_WORKSPACE_ID, name: 'NI Labs', canManageWebapps: true },
+      { id: MOCK_CURRENT_WORKSPACE_ID, name: 'Default', webappCapabilities: this.createMockWebappCapabilities() },
+      { id: MOCK_SECONDARY_WORKSPACE_ID, name: 'NI Labs', webappCapabilities: this.createMockWebappCapabilities() },
     ];
     const feedConfigs = phase === 'not-onboarded'
       ? []
@@ -302,8 +312,17 @@ export class PluginManagerService {
       workspaceName: workspace.name,
       isCurrentWorkspace: workspace.id === MOCK_CURRENT_WORKSPACE_ID,
       hasWorkspaceAccess: true,
-      canManageWebapps: true,
+      webappCapabilities: workspace.webappCapabilities,
     };
+  }
+
+  private createMockWebappCapabilities(): WebappCapabilities {
+    return Object.fromEntries(
+      PluginManagerService.WEBAPP_RESOURCE_TYPES.map(resource => [
+        resource,
+        Object.fromEntries(MOCK_WEBAPP_ACTIONS.map(action => [action, true])),
+      ]),
+    ) as WebappCapabilities;
   }
 
   private cloneMockFeedConfigs(): FeedConfig[] {
@@ -842,47 +861,54 @@ export class PluginManagerService {
       return this.mockState.workspaces.map(workspace => ({ ...workspace }));
     }
 
-    if (!this.workspacesCache) {
-      this.workspacesCache = (async () => {
-        // Workspace listing establishes read access; the authorization response
-        // supplies the separate webapp-management capability for each workspace.
-        const authStatements = await this.listAuthStatements().catch(() => [] as AuthStatement[]);
-        const allWorkspaces: Array<{ id?: string; name?: string; enabled?: boolean }> = [];
-        for (let skip = 0; ; skip += PluginManagerService.WORKSPACE_PAGE_SIZE) {
-          const { data, error } = await getWorkspaces({
-            client: this.userClient,
-            query: {
-              skip,
-              take: PluginManagerService.WORKSPACE_PAGE_SIZE,
-              sortby: 'name',
-              order: 'ascending',
-            },
-          });
-          if (error) {
-            this.workspacesCache = null;
-            throw new Error(`Failed to list workspaces: ${JSON.stringify(error)}`);
-          }
+    if (this.workspacesCache) {
+      return this.workspacesCache;
+    }
 
-          const page = data?.workspaces ?? [];
-          allWorkspaces.push(...page);
-          if (page.length < PluginManagerService.WORKSPACE_PAGE_SIZE) {
-            break;
-          }
+    const promise = (async () => {
+      // Workspace listing establishes read access; the authorization response
+      // supplies the separate webapp-management capability for each workspace.
+      const authStatements = await this.listAuthStatements();
+      const allWorkspaces: Array<{ id?: string; name?: string; enabled?: boolean }> = [];
+      for (let skip = 0; ; skip += PluginManagerService.WORKSPACE_PAGE_SIZE) {
+        const { data, error } = await getWorkspaces({
+          client: this.userClient,
+          query: {
+            skip,
+            take: PluginManagerService.WORKSPACE_PAGE_SIZE,
+            sortby: 'name',
+            order: 'ascending',
+          },
+        });
+        if (error) {
+          throw new Error(`Failed to list workspaces: ${JSON.stringify(error)}`);
         }
 
-        return allWorkspaces
-          .filter((workspace): workspace is { id: string; name?: string; enabled: true } =>
-            !!workspace?.id && workspace.enabled === true
-          )
-          .map(workspace => ({
-            id: workspace.id,
-            name: workspace.name?.trim() || workspace.id,
-            canManageWebapps: this.hasWebappManagementPermission(workspace.id, authStatements),
-          }))
-          .sort((left, right) => left.name.localeCompare(right.name) || left.id.localeCompare(right.id));
-      })();
-    }
-    return this.workspacesCache;
+        const page = data?.workspaces ?? [];
+        allWorkspaces.push(...page);
+        if (page.length < PluginManagerService.WORKSPACE_PAGE_SIZE) {
+          break;
+        }
+      }
+
+      return allWorkspaces
+        .filter((workspace): workspace is { id: string; name?: string; enabled: true } =>
+          !!workspace?.id && workspace.enabled === true
+        )
+        .map(workspace => ({
+          id: workspace.id,
+          name: workspace.name?.trim() || workspace.id,
+          webappCapabilities: this.getWebappCapabilities(workspace.id, authStatements),
+        }))
+        .sort((left, right) => left.name.localeCompare(right.name) || left.id.localeCompare(right.id));
+    })();
+    this.workspacesCache = promise;
+    promise.catch(() => {
+      if (this.workspacesCache === promise) {
+        this.workspacesCache = null;
+      }
+    });
+    return promise;
   }
 
   /** Load the current user's authorization statements once for capability checks. */
@@ -907,25 +933,59 @@ export class PluginManagerService {
     return this.authStatementsCache;
   }
 
-  private hasWebappManagementPermission(workspaceId: string, statements: AuthStatement[]): boolean {
-    const actions = statements
-      .filter(statement => {
-        const scope = statement.workspace?.trim();
-        const resources = statement.resource?.map(resource => resource.toLowerCase()) ?? [];
-        const hasWebappResource = resources.length === 0
-          || resources.includes('*')
-          || resources.some(resource => PluginManagerService.WEBAPP_RESOURCE_TYPES.includes(resource));
-        const hasGlobalWorkspace = !scope || scope === '*' || scope.toLowerCase() === 'global';
-        return hasWebappResource && (hasGlobalWorkspace || scope === workspaceId);
-      })
-      .flatMap(statement => statement.actions ?? [])
-      .map(action => action.toLowerCase());
-
-    if (actions.includes('*') || actions.includes('webapp:*')) {
-      return true;
+  private getWebappCapabilities(workspaceId: string, statements: AuthStatement[]): WebappCapabilities {
+    const capabilities: WebappCapabilities = {};
+    for (const resource of PluginManagerService.WEBAPP_RESOURCE_TYPES) {
+      capabilities[resource] = {};
     }
 
-    return PluginManagerService.WEBAPP_MANAGEMENT_ACTIONS.every(action => actions.includes(action));
+    for (const statement of statements) {
+      const scope = statement.workspace?.trim();
+      const hasGlobalWorkspace = !scope || scope === '*' || scope.toLowerCase() === 'global';
+      if (!hasGlobalWorkspace && scope !== workspaceId) {
+        continue;
+      }
+
+      const statementResources = statement.resource?.map(resource => resource.trim().toLowerCase()) ?? [];
+      const resources = statementResources.length === 0 || statementResources.includes('*')
+        ? PluginManagerService.WEBAPP_RESOURCE_TYPES
+        : PluginManagerService.WEBAPP_RESOURCE_TYPES.filter(resource => statementResources.includes(resource));
+      const statementActions = statement.actions?.map(action => action.trim().toLowerCase()) ?? [];
+      const actions = statementActions.includes('*') || statementActions.includes('webapp:*')
+        ? PluginManagerService.WEBAPP_MANAGEMENT_ACTIONS
+        : PluginManagerService.WEBAPP_MANAGEMENT_ACTIONS.filter(action => statementActions.includes(action));
+
+      for (const resource of resources) {
+        for (const action of actions) {
+          capabilities[resource]![action] = true;
+        }
+      }
+    }
+
+    return capabilities;
+  }
+
+  canInstallApp(capabilities: WebappCapabilities, appType: AppType): boolean {
+    return this.hasWebappAction(capabilities, appType, 'webapp:createwebapp')
+      && this.hasWebappAction(capabilities, appType, 'webapp:uploadwebapp');
+  }
+
+  canUpgradeApp(capabilities: WebappCapabilities, appType: AppType): boolean {
+    return this.hasWebappAction(capabilities, appType, 'webapp:updatewebapp')
+      && this.hasWebappAction(capabilities, appType, 'webapp:uploadwebapp');
+  }
+
+  canUninstallApp(capabilities: WebappCapabilities, appType: AppType): boolean {
+    return this.hasWebappAction(capabilities, appType, 'webapp:deletewebapp');
+  }
+
+  private hasWebappAction(
+    capabilities: WebappCapabilities,
+    appType: AppType,
+    action: WebappAction,
+  ): boolean {
+    const resource = PluginManagerService.WEBAPP_RESOURCE_FOR_APP_TYPE[appType];
+    return capabilities[resource]?.[action] === true;
   }
 
   // ── Feed config (stored in Plugin Manager webapp properties) ───────
@@ -1201,7 +1261,7 @@ export class PluginManagerService {
         workspaceName: workspaceById.get(workspaceId)?.name ?? workspaceId,
         isCurrentWorkspace: workspaceId === currentWorkspace,
         hasWorkspaceAccess: workspaceById.has(workspaceId),
-        canManageWebapps: workspaceById.get(workspaceId)?.canManageWebapps === true,
+        webappCapabilities: workspaceById.get(workspaceId)?.webappCapabilities ?? {},
       });
     }
 
@@ -1230,7 +1290,7 @@ export class PluginManagerService {
         workspaceName: workspaceById.get(workspaceId)?.name ?? workspaceId,
         isCurrentWorkspace: workspaceId === currentWorkspace,
         hasWorkspaceAccess: workspaceById.has(workspaceId),
-        canManageWebapps: workspaceById.get(workspaceId)?.canManageWebapps === true,
+        webappCapabilities: workspaceById.get(workspaceId)?.webappCapabilities ?? {},
       });
     }
 
@@ -1289,7 +1349,7 @@ export class PluginManagerService {
         workspaceName: mappedWorkspace?.name ?? (folderTitle || 'Dashboards'),
         isCurrentWorkspace: mappedWorkspace?.id === currentWorkspace,
         hasWorkspaceAccess: !!mappedWorkspace,
-        canManageWebapps: mappedWorkspace?.canManageWebapps === true,
+        webappCapabilities: mappedWorkspace?.webappCapabilities ?? {},
       });
     }
 
@@ -1351,6 +1411,7 @@ export class PluginManagerService {
     feedConfig: FeedConfig | null,
     workspace?: string,
   ): Promise<void> {
+    const pkgType = (pkg.type || 'webapp').toLowerCase() as AppType;
     if (this.mockState) {
       const resolvedWorkspace = workspace ? workspace : await this.getWorkspace();
       this.installMockPackage(pkg, resolvedWorkspace, feedConfig);
@@ -1360,9 +1421,7 @@ export class PluginManagerService {
 
     const resolvedWorkspace = workspace ? workspace : await this.getWorkspace();
     if (!resolvedWorkspace) throw new Error('Cannot install app: workspace unknown');
-    await this.assertManageableWorkspace(resolvedWorkspace);
-
-    const pkgType = (pkg.type || 'webapp').toLowerCase() as AppType;
+    await this.assertWorkspaceCanPerform(resolvedWorkspace, pkgType, 'install');
 
     if (pkgType === 'notebook') {
       await this.installNotebook(feedId, pkg, feedConfig, resolvedWorkspace);
@@ -1463,6 +1522,9 @@ export class PluginManagerService {
 
     if (workspaces.length === 0) return;
 
+    for (const workspace of workspaces) {
+      await this.assertWorkspaceCanPerform(workspace, 'dashboard', 'install');
+    }
     await this.ensureGrafanaSession();
     const source = await this.fetchDashboardByUid(sourceDashboardUid);
     const baseModel = this.prepareDashboardForImport(source.dashboard ?? {});
@@ -1498,7 +1560,7 @@ export class PluginManagerService {
   async upgradeApp(
     feedId: string,
     pkg: AppPackage,
-    installed: InstalledApp,
+    installed: WorkspaceInstallation,
   ): Promise<void> {
     if (this.mockState) {
       this.upgradeMockInstallation(installed.webappId, pkg.version);
@@ -1506,6 +1568,7 @@ export class PluginManagerService {
       return;
     }
 
+    await this.assertWorkspaceCanPerform(installed.workspaceId, installed.type, 'upgrade');
     const fileName = this.extractFileName(pkg.filename);
     const nipkgBlob = await this.downloadPackageFile(feedId, fileName);
 
@@ -1526,7 +1589,7 @@ export class PluginManagerService {
     pkg: AppPackage,
     installations: WorkspaceInstallation[],
   ): Promise<void> {
-    this.assertManageableInstallations(installations);
+    this.assertInstallationsCanPerform(installations, 'upgrade');
     if (this.mockState) {
       for (const installation of installations) {
         this.upgradeMockInstallation(installation.webappId, pkg.version);
@@ -1630,20 +1693,21 @@ export class PluginManagerService {
 
   /** Uninstall an app from a single workspace.
    * Routes to the correct service based on resource type. */
-  async uninstallApp(installed: InstalledApp): Promise<void> {
+  async uninstallApp(installed: WorkspaceInstallation): Promise<void> {
     if (this.mockState) {
       this.removeMockInstallations([installed.webappId]);
       this.invalidateInstallCache();
       return;
     }
 
+    await this.assertWorkspaceCanPerform(installed.workspaceId, installed.type, 'uninstall');
     await this.deleteResource(installed);
     this.invalidateInstallCache();
   }
 
   /** Uninstall a package from every workspace where it is currently installed. */
   async uninstallAppAcrossWorkspaces(installations: WorkspaceInstallation[]): Promise<void> {
-    this.assertManageableInstallations(installations);
+    this.assertInstallationsCanPerform(installations, 'uninstall');
     if (this.mockState) {
       this.removeMockInstallations(installations.map(installation => installation.webappId));
       this.invalidateInstallCache();
@@ -1677,16 +1741,35 @@ export class PluginManagerService {
     }
   }
 
-  private async assertManageableWorkspace(workspaceId: string): Promise<void> {
+  private async assertWorkspaceCanPerform(
+    workspaceId: string,
+    appType: AppType,
+    operation: WebappOperation,
+  ): Promise<void> {
     const workspace = (await this.listReadableWorkspaces()).find(item => item.id === workspaceId);
-    if (!workspace?.canManageWebapps) {
-      throw new Error(`You do not have permission to manage webapps in workspace "${workspaceId}".`);
+    const allowed = workspace && (
+      operation === 'install'
+        ? this.canInstallApp(workspace.webappCapabilities, appType)
+        : operation === 'upgrade'
+          ? this.canUpgradeApp(workspace.webappCapabilities, appType)
+          : this.canUninstallApp(workspace.webappCapabilities, appType)
+    );
+    if (!allowed) {
+      throw new Error(`You do not have permission to ${operation} ${appType} resources in workspace "${workspaceId}".`);
     }
   }
 
-  private assertManageableInstallations(installations: WorkspaceInstallation[]): void {
-    if (installations.some(installation => !installation.hasWorkspaceAccess || !installation.canManageWebapps)) {
-      throw new Error('You do not have permission to manage one or more installed workspaces.');
+  private assertInstallationsCanPerform(
+    installations: WorkspaceInstallation[],
+    operation: Exclude<WebappOperation, 'install'>,
+  ): void {
+    if (installations.some(installation => {
+      if (!installation.hasWorkspaceAccess) return true;
+      return operation === 'upgrade'
+        ? !this.canUpgradeApp(installation.webappCapabilities, installation.type)
+        : !this.canUninstallApp(installation.webappCapabilities, installation.type);
+    })) {
+      throw new Error(`You do not have permission to ${operation} one or more installed workspaces.`);
     }
   }
 
