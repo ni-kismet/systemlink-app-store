@@ -11,6 +11,7 @@ interface WorkspaceInstallOption {
   workspaceName: string;
   isCurrentWorkspace: boolean;
   alreadyInstalled: boolean;
+  canManageWebapps: boolean;
 }
 
 @Component({
@@ -110,7 +111,10 @@ export class AppDetailComponent implements OnInit {
   }
 
   get upgradeAvailable(): boolean {
-    return !!this.installed && !!this.pkg && isNewerVersion(this.pkg.version, this.installed.version);
+    return !!this.installed
+      && !!this.pkg
+      && isNewerVersion(this.pkg.version, this.installed.version)
+      && this.canManageCurrentInstallation;
   }
 
   get formattedSize(): string {
@@ -121,17 +125,29 @@ export class AppDetailComponent implements OnInit {
     return this.workspaceInstallations.length > 0;
   }
 
+  get canManageCurrentInstallation(): boolean {
+    const installation = this.workspaceInstallations.find(item => item.isCurrentWorkspace);
+    return installation?.hasWorkspaceAccess === true && installation.canManageWebapps;
+  }
+
+  get canManageAllInstallations(): boolean {
+    return this.workspaceInstallations.length > 0
+      && this.workspaceInstallations.every(installation =>
+        installation.hasWorkspaceAccess && installation.canManageWebapps
+      );
+  }
+
   get hasScreenshots(): boolean {
     return !!this.pkg?.screenshots.length;
   }
 
   get installableWorkspaces(): WorkspaceInstallOption[] {
-    return this.installOptions.filter(option => !option.alreadyInstalled);
+    return this.installOptions.filter(option => !option.alreadyInstalled && option.canManageWebapps);
   }
 
   get selectableOptions(): WorkspaceInstallOption[] {
     const pending = new Set(this.pendingWorkspaceIds);
-    return this.installOptions.filter(option => !pending.has(option.workspaceId));
+    return this.installOptions.filter(option => option.canManageWebapps && !pending.has(option.workspaceId));
   }
 
   get applyActionLabel(): string {
@@ -202,18 +218,42 @@ export class AppDetailComponent implements OnInit {
   }
 
   onWorkspaceSelected(id: string): void {
-    if (id && !this.pendingWorkspaceIds.includes(id)) {
+    const option = this.installOptions.find(item => item.workspaceId === id);
+    if (option?.canManageWebapps && !this.pendingWorkspaceIds.includes(id)) {
       this.pendingWorkspaceIds = [...this.pendingWorkspaceIds, id];
     }
     this.selectedWorkspaceId = '';
   }
 
   removeWorkspace(id: string): void {
+    if (!this.canRemoveWorkspace(id)) return;
     this.pendingWorkspaceIds = this.pendingWorkspaceIds.filter(w => w !== id);
   }
 
   getWorkspaceName(id: string): string {
-    return this.installOptions.find(o => o.workspaceId === id)?.workspaceName ?? id;
+    const option = this.installOptions.find(o => o.workspaceId === id);
+    const installation = this.workspaceInstallations.find(i => i.workspaceId === id);
+    if (option && option.canManageWebapps) {
+      return option.workspaceName;
+    }
+    if (installation && installation.hasWorkspaceAccess && installation.canManageWebapps) {
+      return installation.workspaceName;
+    }
+    return id;
+  }
+
+  getInstallationWorkspaceName(installation: WorkspaceInstallation): string {
+    return installation.hasWorkspaceAccess && installation.canManageWebapps
+      ? installation.workspaceName
+      : installation.workspaceId || installation.workspaceName;
+  }
+
+  canRemoveWorkspace(id: string): boolean {
+    const installation = this.workspaceInstallations.find(item => item.workspaceId === id);
+    if (installation) {
+      return installation.hasWorkspaceAccess && installation.canManageWebapps;
+    }
+    return this.installOptions.find(option => option.workspaceId === id)?.canManageWebapps === true;
   }
 
   isCurrentWorkspace(id: string): boolean {
@@ -237,20 +277,6 @@ export class AppDetailComponent implements OnInit {
     return `${displayName} screenshot ${index + 1}`;
   }
 
-  getCardSubtitle(pkg: AppPackage): string {
-    const type = (pkg.type || 'webapp').toLowerCase();
-    switch (type) {
-      case 'webapp':
-        return 'Web App';
-      case 'notebook':
-        return 'Notebook';
-      case 'dashboard':
-        return 'Dashboard';
-      default:
-        return type.charAt(0).toUpperCase() + type.slice(1);
-    }
-  }
-
   async applyWorkspaceChanges(): Promise<void> {
     if (!this.pkg || this.actionLoading) return;
     const feedId = this.pkg.sourceFeedId ?? this.feedId;
@@ -259,8 +285,12 @@ export class AppDetailComponent implements OnInit {
     const feedConfig = this.feedConfig?.feedId === feedId
       ? this.feedConfig
       : null;
-    const toInstallIds = this.pendingWorkspaceIds.filter(id => !this.originalInstalledIds.has(id));
-    const toUninstall = this.workspaceInstallations.filter(inst => !this.pendingWorkspaceIds.includes(inst.workspaceId));
+    const toInstallIds = this.pendingWorkspaceIds.filter(id =>
+      !this.originalInstalledIds.has(id) && this.canRemoveWorkspace(id)
+    );
+    const toUninstall = this.workspaceInstallations.filter(inst =>
+      !this.pendingWorkspaceIds.includes(inst.workspaceId) && this.canRemoveWorkspace(inst.workspaceId)
+    );
     const telemetryPackage = this.telemetry.packageFromAppPackage(this.pkg);
     this.actionLoading = true;
     this.error = '';
@@ -335,7 +365,7 @@ export class AppDetailComponent implements OnInit {
   }
 
   async upgrade(): Promise<void> {
-    if (!this.pkg || !this.installed || this.actionLoading) return;
+    if (!this.pkg || !this.installed || !this.canManageCurrentInstallation || this.actionLoading) return;
     const feedId = this.pkg.sourceFeedId ?? this.feedId;
     if (!feedId) return;
     const telemetryPackage = this.telemetry.packageFromAppPackage(this.pkg);
@@ -385,7 +415,7 @@ export class AppDetailComponent implements OnInit {
   }
 
   async uninstall(): Promise<void> {
-    if (!this.pkg || !this.workspaceInstallations.length || this.actionLoading) return;
+    if (!this.pkg || !this.canManageAllInstallations || this.actionLoading) return;
     const telemetryPackage = this.telemetry.packageFromAppPackage(this.pkg);
     this.actionLoading = true;
     this.error = '';
@@ -455,6 +485,7 @@ export class AppDetailComponent implements OnInit {
       workspaceName: workspace.name,
       isCurrentWorkspace: workspace.id === this.currentWorkspace,
       alreadyInstalled: installedWorkspaceIds.has(workspace.id),
+      canManageWebapps: workspace.canManageWebapps,
     })).sort((left, right) => {
       if (left.isCurrentWorkspace !== right.isCurrentWorkspace) {
         return left.isCurrentWorkspace ? -1 : 1;
@@ -468,6 +499,7 @@ export class AppDetailComponent implements OnInit {
         workspaceName: this.currentWorkspace,
         isCurrentWorkspace: true,
         alreadyInstalled: installedWorkspaceIds.has(this.currentWorkspace),
+        canManageWebapps: false,
       }];
     }
   }

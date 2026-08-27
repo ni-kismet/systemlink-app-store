@@ -79,6 +79,8 @@ export interface InstalledApp {
 export interface WorkspaceInfo {
   id: string;
   name: string;
+  /** Whether the current user can manage webapps in this workspace. */
+  canManageWebapps: boolean;
 }
 
 /** An installed plugin annotated with its package name and owning workspace. */
@@ -90,6 +92,10 @@ export interface WorkspaceInstallation extends InstalledApp {
   workspaceId: string;
   workspaceName: string;
   isCurrentWorkspace: boolean;
+  /** Whether the current user can read this workspace. */
+  hasWorkspaceAccess: boolean;
+  /** Whether the current user can create, modify, and delete webapps here. */
+  canManageWebapps: boolean;
 }
 
 /** Combined view: catalog package + install status across workspaces. */
@@ -137,4 +143,3 @@ export const SL_PLUGIN_MANAGER_PROP_FEED_ID = 'slPluginManager.feedId';
 export const SL_PLUGIN_MANAGER_PROP_FEED_URL = 'slPluginManager.feedUrl';
 export const SL_PLUGIN_MANAGER_PROP_INSTALLED_AT = 'slPluginManager.installedAt';
 export const SL_PLUGIN_MANAGER_PROP_UPDATED_AT = 'slPluginManager.updatedAt';
-

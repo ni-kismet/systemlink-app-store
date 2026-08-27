@@ -36,6 +36,9 @@ import {
 import type { ApplyUpdateDescriptor, Package } from '@ni/systemlink-clients-ts/feeds';
 import { createClient as createUserClient, createConfig as createUserConfig } from '@ni/systemlink-clients-ts/user/client';
 import { getWorkspaces } from '@ni/systemlink-clients-ts/user';
+import { createClient as createAuthClient, createConfig as createAuthConfig } from '@ni/systemlink-clients-ts/auth/client';
+import { auth as sdkAuth } from '@ni/systemlink-clients-ts/auth';
+import type { AuthStatement } from '@ni/systemlink-clients-ts/auth';
 import { createClient as createWebAppClient, createConfig as createWebAppConfig } from '@ni/systemlink-clients-ts/web-application/client';
 import {
   listWebapps as sdkListWebapps,
@@ -107,6 +110,9 @@ export class PluginManagerService {
   private userClient = createUserClient(
     createUserConfig({ baseUrl: `${this.origin}/niuser/v1`, credentials: 'include' })
   );
+  private authClient = createAuthClient(
+    createAuthConfig({ baseUrl: `${this.origin}/niauth/v1`, credentials: 'include' })
+  );
   private webAppClient = createWebAppClient(
     createWebAppConfig({ baseUrl: `${this.origin}/niapp/v1`, credentials: 'include' })
   );
@@ -121,7 +127,16 @@ export class PluginManagerService {
   private installedCache: { promise: Promise<WorkspaceInstallation[]>; ts: number } | null = null;
   private permissionCheckCache: Promise<any> | null = null;
   private workspacesCache: Promise<WorkspaceInfo[]> | null = null;
+  private authStatementsCache: Promise<AuthStatement[]> | null = null;
   private static readonly CACHE_TTL_MS = 60_000; // 1 minute
+  private static readonly WORKSPACE_PAGE_SIZE = 100;
+  private static readonly WEBAPP_MANAGEMENT_ACTIONS = [
+    'webapp:createwebapp',
+    'webapp:updatewebapp',
+    'webapp:deletewebapp',
+    'webapp:uploadwebapp',
+  ];
+  private static readonly WEBAPP_RESOURCE_TYPES = ['webvi', 'notebook', 'dataspace'];
 
   getMockPhase(): string | null {
     return this.mockState?.phase ?? null;
@@ -166,8 +181,8 @@ export class PluginManagerService {
     }
 
     const workspaces: WorkspaceInfo[] = [
-      { id: MOCK_CURRENT_WORKSPACE_ID, name: 'Default' },
-      { id: MOCK_SECONDARY_WORKSPACE_ID, name: 'NI Labs' },
+      { id: MOCK_CURRENT_WORKSPACE_ID, name: 'Default', canManageWebapps: true },
+      { id: MOCK_SECONDARY_WORKSPACE_ID, name: 'NI Labs', canManageWebapps: true },
     ];
     const feedConfigs = phase === 'not-onboarded'
       ? []
@@ -286,6 +301,8 @@ export class PluginManagerService {
       workspaceId: workspace.id,
       workspaceName: workspace.name,
       isCurrentWorkspace: workspace.id === MOCK_CURRENT_WORKSPACE_ID,
+      hasWorkspaceAccess: true,
+      canManageWebapps: true,
     };
   }
 
@@ -827,21 +844,88 @@ export class PluginManagerService {
 
     if (!this.workspacesCache) {
       this.workspacesCache = (async () => {
-        const { data, error } = await getWorkspaces({ client: this.userClient });
-        if (error) {
-          this.workspacesCache = null;
-          throw new Error(`Failed to list workspaces: ${JSON.stringify(error)}`);
+        // Workspace listing establishes read access; the authorization response
+        // supplies the separate webapp-management capability for each workspace.
+        const authStatements = await this.listAuthStatements().catch(() => [] as AuthStatement[]);
+        const allWorkspaces: Array<{ id?: string; name?: string; enabled?: boolean }> = [];
+        for (let skip = 0; ; skip += PluginManagerService.WORKSPACE_PAGE_SIZE) {
+          const { data, error } = await getWorkspaces({
+            client: this.userClient,
+            query: {
+              skip,
+              take: PluginManagerService.WORKSPACE_PAGE_SIZE,
+              sortby: 'name',
+              order: 'ascending',
+            },
+          });
+          if (error) {
+            this.workspacesCache = null;
+            throw new Error(`Failed to list workspaces: ${JSON.stringify(error)}`);
+          }
+
+          const page = data?.workspaces ?? [];
+          allWorkspaces.push(...page);
+          if (page.length < PluginManagerService.WORKSPACE_PAGE_SIZE) {
+            break;
+          }
         }
-        return (data?.workspaces ?? [])
-          .filter((workspace): workspace is { id: string; name?: string } => !!workspace?.id)
+
+        return allWorkspaces
+          .filter((workspace): workspace is { id: string; name?: string; enabled: true } =>
+            !!workspace?.id && workspace.enabled === true
+          )
           .map(workspace => ({
             id: workspace.id,
             name: workspace.name?.trim() || workspace.id,
+            canManageWebapps: this.hasWebappManagementPermission(workspace.id, authStatements),
           }))
           .sort((left, right) => left.name.localeCompare(right.name) || left.id.localeCompare(right.id));
       })();
     }
     return this.workspacesCache;
+  }
+
+  /** Load the current user's authorization statements once for capability checks. */
+  private async listAuthStatements(): Promise<AuthStatement[]> {
+    if (this.mockState) {
+      return [{ actions: ['webapp:*'] }];
+    }
+
+    if (!this.authStatementsCache) {
+      this.authStatementsCache = sdkAuth({ client: this.authClient })
+        .then(({ data, error }) => {
+          if (error) {
+            throw new Error(`Failed to load authorization: ${JSON.stringify(error)}`);
+          }
+          return data?.policies?.flatMap(policy => policy.statements ?? []) ?? [];
+        })
+        .catch(error => {
+          this.authStatementsCache = null;
+          throw error;
+        });
+    }
+    return this.authStatementsCache;
+  }
+
+  private hasWebappManagementPermission(workspaceId: string, statements: AuthStatement[]): boolean {
+    const actions = statements
+      .filter(statement => {
+        const scope = statement.workspace?.trim();
+        const resources = statement.resource?.map(resource => resource.toLowerCase()) ?? [];
+        const hasWebappResource = resources.length === 0
+          || resources.includes('*')
+          || resources.some(resource => PluginManagerService.WEBAPP_RESOURCE_TYPES.includes(resource));
+        const hasGlobalWorkspace = !scope || scope === '*' || scope.toLowerCase() === 'global';
+        return hasWebappResource && (hasGlobalWorkspace || scope === workspaceId);
+      })
+      .flatMap(statement => statement.actions ?? [])
+      .map(action => action.toLowerCase());
+
+    if (actions.includes('*') || actions.includes('webapp:*')) {
+      return true;
+    }
+
+    return PluginManagerService.WEBAPP_MANAGEMENT_ACTIONS.every(action => actions.includes(action));
   }
 
   // ── Feed config (stored in Plugin Manager webapp properties) ───────
@@ -1081,7 +1165,7 @@ export class PluginManagerService {
       this.loadFeedConfigs().catch(() => [] as FeedConfig[]),
     ]);
 
-    const workspaceNames = new Map(workspaces.map(w => [w.id, w.name]));
+    const workspaceById = new Map(workspaces.map(workspace => [workspace.id, workspace]));
     const installations: WorkspaceInstallation[] = [];
 
     // Webapps: identified by Plugin Manager package-name properties.
@@ -1114,8 +1198,10 @@ export class PluginManagerService {
         installedAt: this.readProperty(props, SL_PLUGIN_MANAGER_PROP_INSTALLED_AT, LEGACY_APPSTORE_PROP_INSTALLED_AT),
         updatedAt: this.readProperty(props, SL_PLUGIN_MANAGER_PROP_UPDATED_AT, LEGACY_APPSTORE_PROP_UPDATED_AT) || null,
         workspaceId,
-        workspaceName: workspaceNames.get(workspaceId) ?? workspaceId,
+        workspaceName: workspaceById.get(workspaceId)?.name ?? workspaceId,
         isCurrentWorkspace: workspaceId === currentWorkspace,
+        hasWorkspaceAccess: workspaceById.has(workspaceId),
+        canManageWebapps: workspaceById.get(workspaceId)?.canManageWebapps === true,
       });
     }
 
@@ -1141,16 +1227,18 @@ export class PluginManagerService {
         installedAt: this.readProperty(props, SL_PLUGIN_MANAGER_PROP_INSTALLED_AT, LEGACY_APPSTORE_PROP_INSTALLED_AT),
         updatedAt: this.readProperty(props, SL_PLUGIN_MANAGER_PROP_UPDATED_AT, LEGACY_APPSTORE_PROP_UPDATED_AT) || null,
         workspaceId,
-        workspaceName: workspaceNames.get(workspaceId) ?? workspaceId,
+        workspaceName: workspaceById.get(workspaceId)?.name ?? workspaceId,
         isCurrentWorkspace: workspaceId === currentWorkspace,
+        hasWorkspaceAccess: workspaceById.has(workspaceId),
+        canManageWebapps: workspaceById.get(workspaceId)?.canManageWebapps === true,
       });
     }
 
     // Build a map from Grafana folder title -> workspace for dashboard workspace association
     // SystemLink folders are named "{WorkspaceName} Workspace"
-    const folderToWorkspace = new Map<string, { id: string; name: string }>();
+    const folderToWorkspace = new Map<string, WorkspaceInfo>();
     for (const w of workspaces) {
-      folderToWorkspace.set(`${w.name} Workspace`, { id: w.id, name: w.name });
+      folderToWorkspace.set(`${w.name} Workspace`, w);
     }
 
     // Dashboards: identified by Plugin Manager tags, metadata encoded in tag prefixes.
@@ -1200,6 +1288,8 @@ export class PluginManagerService {
         workspaceId: mappedWorkspace?.id ?? '',
         workspaceName: mappedWorkspace?.name ?? (folderTitle || 'Dashboards'),
         isCurrentWorkspace: mappedWorkspace?.id === currentWorkspace,
+        hasWorkspaceAccess: !!mappedWorkspace,
+        canManageWebapps: mappedWorkspace?.canManageWebapps === true,
       });
     }
 
@@ -1270,6 +1360,7 @@ export class PluginManagerService {
 
     const resolvedWorkspace = workspace ? workspace : await this.getWorkspace();
     if (!resolvedWorkspace) throw new Error('Cannot install app: workspace unknown');
+    await this.assertManageableWorkspace(resolvedWorkspace);
 
     const pkgType = (pkg.type || 'webapp').toLowerCase() as AppType;
 
@@ -1435,6 +1526,7 @@ export class PluginManagerService {
     pkg: AppPackage,
     installations: WorkspaceInstallation[],
   ): Promise<void> {
+    this.assertManageableInstallations(installations);
     if (this.mockState) {
       for (const installation of installations) {
         this.upgradeMockInstallation(installation.webappId, pkg.version);
@@ -1551,6 +1643,7 @@ export class PluginManagerService {
 
   /** Uninstall a package from every workspace where it is currently installed. */
   async uninstallAppAcrossWorkspaces(installations: WorkspaceInstallation[]): Promise<void> {
+    this.assertManageableInstallations(installations);
     if (this.mockState) {
       this.removeMockInstallations(installations.map(installation => installation.webappId));
       this.invalidateInstallCache();
@@ -1581,6 +1674,19 @@ export class PluginManagerService {
       }
     } else {
       await this.deleteWebapp(installed.webappId);
+    }
+  }
+
+  private async assertManageableWorkspace(workspaceId: string): Promise<void> {
+    const workspace = (await this.listReadableWorkspaces()).find(item => item.id === workspaceId);
+    if (!workspace?.canManageWebapps) {
+      throw new Error(`You do not have permission to manage webapps in workspace "${workspaceId}".`);
+    }
+  }
+
+  private assertManageableInstallations(installations: WorkspaceInstallation[]): void {
+    if (installations.some(installation => !installation.hasWorkspaceAccess || !installation.canManageWebapps)) {
+      throw new Error('You do not have permission to manage one or more installed workspaces.');
     }
   }
 

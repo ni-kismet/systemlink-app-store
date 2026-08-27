@@ -88,7 +88,7 @@ export class InstalledComponent implements OnInit {
       return false;
     }
 
-    return this.hasSelectedRows;
+    return this.selectedEntries.some(entry => this.manageableInstallations(entry).length > 0);
   }
 
   openDetail(entry: InstalledEntry): void {
@@ -111,8 +111,7 @@ export class InstalledComponent implements OnInit {
   }
 
   async upgradeSelected(): Promise<void> {
-    if (this.upgradingAll || this.actionLoading) return;
-
+    if (!this.hasPermission || this.upgradingAll || this.actionLoading) return;
     const upgradableEntries = this.selectedEntries.filter(entry => entry.upgradeAvailable && entry.catalogPkg);
     if (upgradableEntries.length === 0) return;
 
@@ -126,7 +125,7 @@ export class InstalledComponent implements OnInit {
         await this.appStoreService.upgradeAppAcrossWorkspaces(
           feedId,
           entry.catalogPkg!,
-          entry.installations,
+          this.manageableInstallations(entry),
         );
       }
 
@@ -139,17 +138,19 @@ export class InstalledComponent implements OnInit {
   }
 
   async uninstallSelected(): Promise<void> {
-    if (this.upgradingAll || this.actionLoading) return;
+    if (!this.hasPermission || this.upgradingAll || this.actionLoading) return;
 
-    const selectedEntries = this.selectedEntries;
-    if (selectedEntries.length === 0) return;
+    const selectedInstallations = this.selectedEntries
+      .map(entry => this.manageableInstallations(entry))
+      .filter(installations => installations.length > 0);
+    if (selectedInstallations.length === 0) return;
 
     this.actionLoading = 'bulk-uninstall';
     this.error = '';
 
     try {
-      for (const entry of selectedEntries) {
-        await this.appStoreService.uninstallAppAcrossWorkspaces(entry.installations);
+      for (const installations of selectedInstallations) {
+        await this.appStoreService.uninstallAppAcrossWorkspaces(installations);
       }
 
       await this.loadInstalledApps(false);
@@ -183,7 +184,8 @@ export class InstalledComponent implements OnInit {
   }
 
   async upgrade(entry: InstalledEntry): Promise<void> {
-    if (!entry.catalogPkg || this.actionLoading) return;
+    const installations = this.manageableInstallations(entry);
+    if (!entry.catalogPkg || installations.length === 0 || this.actionLoading) return;
     const feedId = entry.catalogPkg.sourceFeedId ?? this.feedId;
     if (!feedId) return;
     const telemetryPackage = this.telemetry.packageFromAppPackage(entry.catalogPkg);
@@ -191,23 +193,23 @@ export class InstalledComponent implements OnInit {
     this.error = '';
     this.telemetry.trackPackageAction('upgrade', 'started', telemetryPackage, {
       source: 'installed_page',
-      workspaceCount: entry.installations.length,
+      workspaceCount: installations.length,
     });
     try {
       await this.appStoreService.upgradeAppAcrossWorkspaces(
         feedId,
         entry.catalogPkg,
-        entry.installations,
+        installations,
       );
       this.telemetry.trackPackageAction('upgrade', 'succeeded', telemetryPackage, {
         source: 'installed_page',
-        workspaceCount: entry.installations.length,
+        workspaceCount: installations.length,
       });
       await this.loadInstalledApps(false);
     } catch (e: any) {
       this.telemetry.trackPackageAction('upgrade', 'failed', telemetryPackage, {
         source: 'installed_page',
-        workspaceCount: entry.installations.length,
+        workspaceCount: installations.length,
         errorMessage: e?.message ?? String(e),
       });
       this.error = `Upgrade of ${entry.packageName} failed: ${e.message}`;
@@ -217,7 +219,7 @@ export class InstalledComponent implements OnInit {
   }
 
   async upgradeAll(): Promise<void> {
-    if (this.upgradingAll) return;
+    if (!this.hasPermission || this.upgradingAll || this.actionLoading) return;
     this.upgradingAll = true;
     this.error = '';
 
@@ -234,7 +236,7 @@ export class InstalledComponent implements OnInit {
         await this.appStoreService.upgradeAppAcrossWorkspaces(
           feedId,
           entry.catalogPkg!,
-          entry.installations,
+          this.manageableInstallations(entry),
         );
       }
 
@@ -256,7 +258,8 @@ export class InstalledComponent implements OnInit {
   }
 
   async uninstall(entry: InstalledEntry): Promise<void> {
-    if (this.actionLoading) return;
+    const installations = this.manageableInstallations(entry);
+    if (installations.length === 0 || this.actionLoading) return;
     const telemetryPackage = entry.catalogPkg
       ? this.telemetry.packageFromAppPackage(entry.catalogPkg)
       : {
@@ -270,19 +273,19 @@ export class InstalledComponent implements OnInit {
     this.error = '';
     this.telemetry.trackPackageAction('uninstall', 'started', telemetryPackage, {
       source: 'installed_page',
-      workspaceCount: entry.installations.length,
+      workspaceCount: installations.length,
     });
     try {
-      await this.appStoreService.uninstallAppAcrossWorkspaces(entry.installations);
+      await this.appStoreService.uninstallAppAcrossWorkspaces(installations);
       this.telemetry.trackPackageAction('uninstall', 'succeeded', telemetryPackage, {
         source: 'installed_page',
-        workspaceCount: entry.installations.length,
+        workspaceCount: installations.length,
       });
       await this.loadInstalledApps(false);
     } catch (e: any) {
       this.telemetry.trackPackageAction('uninstall', 'failed', telemetryPackage, {
         source: 'installed_page',
-        workspaceCount: entry.installations.length,
+        workspaceCount: installations.length,
         errorMessage: e?.message ?? String(e),
       });
       this.error = `Uninstall of ${entry.packageName} failed: ${e.message}`;
@@ -345,7 +348,9 @@ export class InstalledComponent implements OnInit {
             packageName,
             installations: pkgInstallations.sort((left, right) => left.workspaceName.localeCompare(right.workspaceName)),
             catalogPkg,
-            upgradeAvailable: !!catalogPkg && pkgInstallations.some(i => isNewerVersion(catalogPkg.version, i.version)),
+            upgradeAvailable: !!catalogPkg && pkgInstallations.some(i =>
+              this.isManageableInstallation(i) && isNewerVersion(catalogPkg.version, i.version)
+            ),
           };
         })
         .sort((left, right) => {
@@ -389,5 +394,13 @@ export class InstalledComponent implements OnInit {
       workspaces: workspaceList,
       lastActivity: lastActivity ? new Date(lastActivity).toLocaleDateString() : 'Unknown',
     };
+  }
+
+  private isManageableInstallation(installation: WorkspaceInstallation): boolean {
+    return installation.hasWorkspaceAccess && installation.canManageWebapps;
+  }
+
+  private manageableInstallations(entry: InstalledEntry): WorkspaceInstallation[] {
+    return entry.installations.filter(installation => this.isManageableInstallation(installation));
   }
 }

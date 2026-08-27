@@ -20,7 +20,6 @@
         <div *ngIf="!pkg.icon" class="icon-placeholder">{{ pkg.displayName.charAt(0) }}</div>
       </div>
       <div class="header-info">
-        <p class="page-eyebrow">{{ getCardSubtitle(pkg) }}</p>
         <h2 class="pkg-name">{{ pkg.displayName }}</h2>
         <p class="page-summary">Review package details, screenshots, and workspace installations before you install, upgrade, or remove this extension.</p>
         <span class="pkg-author">{{ pkg.author }}</span>
@@ -33,7 +32,7 @@
         <nimble-button *ngIf="installed && upgradeAvailable" appearance="outline" (click)="upgrade()" [disabled]="actionLoading">
           {{ actionLoading ? 'Upgrading…' : 'Upgrade' }}
         </nimble-button>
-        <nimble-button *ngIf="installedSomewhere" appearance="ghost" (click)="openUninstallDialog()" [disabled]="actionLoading">
+        <nimble-button *ngIf="canManageAllInstallations" appearance="ghost" (click)="openUninstallDialog()" [disabled]="actionLoading">
           Uninstall
         </nimble-button>
       </div>
@@ -115,12 +114,13 @@
           <div class="workspace-installations">
             <div *ngFor="let installation of workspaceInstallations" class="workspace-installation-row">
               <span class="workspace-installation-name">
-                {{ installation.workspaceName }}
+                {{ getInstallationWorkspaceName(installation) }}
                 <span *ngIf="installation.isCurrentWorkspace">(current)</span>
               </span>
               <span class="workspace-installation-version">v{{ installation.version }}</span>
               <span class="workspace-installation-spacer"></span>
               <nimble-anchor-button
+                *ngIf="installation.hasWorkspaceAccess"
                 [href]="getResourceUrl(installation)"
                 target="_blank"
                 appearance="ghost">
@@ -164,7 +164,14 @@
             <span *ngIf="isCurrentWorkspace(id)" class="pending-workspace-current">(current)</span>
             <span *ngIf="isAlreadyInstalled(id) && !isCurrentWorkspace(id)" class="pending-workspace-current">(installed)</span>
           </span>
-          <nimble-button appearance="ghost" class="sl-selection-action" (click)="removeWorkspace(id)" [disabled]="actionLoading">Remove</nimble-button>
+          <nimble-button
+            *ngIf="canRemoveWorkspace(id)"
+            appearance="ghost"
+            class="sl-selection-action"
+            (click)="removeWorkspace(id)"
+            [disabled]="actionLoading">
+            Remove
+          </nimble-button>
         </div>
       </div>
     </div>
